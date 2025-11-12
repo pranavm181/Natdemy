@@ -1,0 +1,2375 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:url_launcher/url_launcher.dart';
+import 'package:google_nav_bar/google_nav_bar.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../data/student.dart';
+import '../data/course_catalog.dart';
+import '../data/joined_courses.dart';
+import '../data/auth_helper.dart';
+import '../utils/course_utils.dart';
+import '../utils/image_utils.dart';
+import '../utils/responsive.dart';
+import '../widgets/rating_stars.dart';
+import '../widgets/main_drawer.dart';
+import '../api/course_service.dart';
+import '../api/contact_service.dart';
+import '../api/student_service.dart';
+import '../api/testimonial_service.dart';
+import '../data/testimonial.dart';
+import 'all_courses_page.dart';
+import 'course_detail.dart';
+import 'edit_profile_screen.dart';
+import 'loginscreen.dart';
+import 'my_courses.dart';
+import 'about_page.dart';
+import 'privacy_policy_page.dart';
+
+class HomeShell extends StatefulWidget {
+  const HomeShell({super.key, required this.student});
+
+  final Student student;
+
+  @override
+  State<HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends State<HomeShell> {
+  int _currentIndex = 0;
+  bool _isInitialized = false;
+  late Student _currentStudent;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentStudent = widget.student;
+    _initializeCourses();
+  }
+
+  Future<void> _initializeCourses() async {
+    // Small delay to ensure platform channels are ready
+    await Future.delayed(const Duration(milliseconds: 100));
+    // Always ensure courses are loaded for the current user
+    await JoinedCourses.instance.initialize(_currentStudent.email);
+    
+    // Try to refresh student data from API
+    try {
+      final apiStudent = await StudentService.fetchStudentByEmail(_currentStudent.email);
+      if (apiStudent != null && mounted) {
+        setState(() {
+          _currentStudent = apiStudent;
+        });
+        // Save updated data
+        await AuthHelper.saveLoginData(apiStudent);
+      }
+    } catch (e) {
+      debugPrint('Error refreshing student data: $e');
+    }
+    
+    if (mounted) {
+      setState(() {
+        _isInitialized = true;
+      });
+    }
+  }
+
+  void _updateStudent(Student updatedStudent) {
+    setState(() {
+      _currentStudent = updatedStudent;
+    });
+  }
+  
+  Future<void> _refreshStudentData() async {
+    try {
+      final apiStudent = await StudentService.fetchStudentByEmail(_currentStudent.email);
+      if (apiStudent != null && mounted) {
+        setState(() {
+          _currentStudent = apiStudent;
+        });
+        // Save updated data
+        await AuthHelper.saveLoginData(apiStudent);
+      }
+    } catch (e) {
+      debugPrint('Error refreshing student data: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = [
+      HomeTab(student: _currentStudent),
+      MyCoursesScreen(student: _currentStudent),
+      ProfileTab(
+        student: _currentStudent,
+        onProfileUpdated: _updateStudent,
+      ),
+    ];
+
+    return Scaffold(
+      drawer: kIsWeb ? null : MainDrawer(
+        student: _currentStudent,
+        onNavigateToHome: () => setState(() => _currentIndex = 0),
+        onNavigateToMyCourses: () => setState(() => _currentIndex = 1),
+        onNavigateToProfile: () => setState(() => _currentIndex = 2),
+      ),
+      body: kIsWeb ? Row(
+        children: [
+          // Sidebar Navigation for Web
+          Container(
+            width: 280,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                right: BorderSide(
+                  color: Colors.grey[200]!,
+                  width: 1,
+                ),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 8,
+                  offset: const Offset(2, 0),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Profile Card at Top
+                Container(
+                  margin: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF582DB0).withOpacity(0.2),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Profile Image
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                        ),
+                        child: CircleAvatar(
+                          radius: 40,
+                          backgroundColor: Colors.white,
+                          backgroundImage: ImageUtils.getProfileImageProvider(_currentStudent.profileImagePath),
+                          child: ImageUtils.hasProfileImage(_currentStudent.profileImagePath)
+                              ? null
+                              : const Icon(Icons.person, size: 40, color: Color(0xFF582DB0)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Name
+                      Text(
+                        _currentStudent.name.isEmpty ? 'Student' : _currentStudent.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      // Email
+                      Text(
+                        _currentStudent.email,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Navigation Items
+                _buildNavItem(Icons.home_outlined, 'Home', 0),
+                const SizedBox(height: 12),
+                _buildNavItem(Icons.menu_book_outlined, 'Courses', 1),
+                const SizedBox(height: 12),
+                _buildNavItem(Icons.person_outline, 'Profile', 2),
+                const Spacer(),
+                // Logout Button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Sign Out'),
+                            content: const Text('Are you sure you want to sign out?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('Cancel'),
+                              ),
+                              FilledButton(
+                                onPressed: () async {
+                                  await JoinedCourses.instance.clear();
+                                  await AuthHelper.clearLoginData();
+                                  if (!context.mounted) return;
+                                  Navigator.of(context).pop();
+                                  Navigator.of(context).pushAndRemoveUntil(
+                                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                                    (route) => false,
+                                  );
+                                },
+                                child: const Text('Sign Out'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFEF4444), width: 2),
+                        foregroundColor: const Color(0xFFEF4444),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.logout, size: 20),
+                      label: const Text(
+                        'Sign Out',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // NATDEMY Logo at Bottom
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  child: Column(
+                    children: [
+                      // Logo Icon
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF582DB0).withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: CustomPaint(
+                          size: const Size(64, 64),
+                          painter: _NatdemyLogoPainter(),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Logo Text
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'NATD',
+                            style: TextStyle(
+                              color: const Color(0xFF1E293B),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 2,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFA1C95C),
+                                    borderRadius: BorderRadius.circular(1),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Container(
+                                  width: 8,
+                                  height: 2,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFA1C95C),
+                                    borderRadius: BorderRadius.circular(1),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Container(
+                                  width: 6,
+                                  height: 2,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFA1C95C),
+                                    borderRadius: BorderRadius.circular(1),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            'MY',
+                            style: TextStyle(
+                              color: const Color(0xFF1E293B),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Any Time Any Where',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Main Content
+          Expanded(
+            child: pages[_currentIndex],
+          ),
+        ],
+      ) : pages[_currentIndex],
+      bottomNavigationBar: kIsWeb ? null : Container(
+        margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF582DB0),
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+            child: GNav(
+              backgroundColor: Colors.transparent,
+              color: Colors.white,
+              activeColor: const Color(0xFFA1C95C),
+              tabBackgroundColor: const Color(0xFFA1C95C).withOpacity(0.2),
+              gap: 8,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              curve: Curves.easeInOut,
+              tabs: const [
+                GButton(
+                  icon: Icons.home_outlined,
+                  text: 'Home',
+                ),
+                GButton(
+                  icon: Icons.menu_book_outlined,
+                  text: 'My Courses',
+                ),
+                GButton(
+                  icon: Icons.person_outline,
+                  text: 'Profile',
+                ),
+              ],
+              selectedIndex: _currentIndex,
+              onTabChange: (index) async {
+                // Reload courses when My Courses tab is selected
+                if (index == 1) {
+                  await JoinedCourses.instance.initialize(_currentStudent.email);
+                }
+                setState(() => _currentIndex = index);
+              },
+            ),
+          ),
+        ),
+      ),
+      extendBody: !kIsWeb,
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, String label, int index) {
+    final isSelected = _currentIndex == index;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? const Color(0xFF582DB0).withOpacity(0.1) 
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          border: isSelected
+              ? Border.all(
+                  color: const Color(0xFF582DB0).withOpacity(0.3),
+                  width: 1,
+                )
+              : null,
+        ),
+        child: InkWell(
+          onTap: () {
+            if (index == 1) {
+              JoinedCourses.instance.initialize(_currentStudent.email);
+            }
+            setState(() => _currentIndex = index);
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Row(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFF582DB0).withOpacity(0.15)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon,
+                  color: isSelected ? const Color(0xFF582DB0) : Colors.grey[600],
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? const Color(0xFF582DB0) : Colors.grey[700],
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+}
+
+class _NatdemyLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF582DB0)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    // Create flowing N shape with rounded corners
+    final path = Path();
+    
+    // Left vertical line (rounded)
+    path.moveTo(6, 8);
+    path.quadraticBezierTo(6, 6, 8, 6);
+    path.lineTo(8, 34);
+    path.quadraticBezierTo(8, 36, 6, 36);
+    
+    // Diagonal connection (flowing curve)
+    path.moveTo(8, 8);
+    path.quadraticBezierTo(18, 18, 28, 28);
+    path.quadraticBezierTo(30, 30, 32, 30);
+    
+    // Right vertical line (rounded)
+    path.moveTo(32, 8);
+    path.quadraticBezierTo(32, 6, 34, 6);
+    path.lineTo(34, 34);
+    path.quadraticBezierTo(34, 36, 32, 36);
+    
+    canvas.drawPath(path, paint);
+    
+    // Arrow at top right (integrated into N)
+    final arrowPaint = Paint()
+      ..color = const Color(0xFF582DB0)
+      ..style = PaintingStyle.fill;
+    
+    final arrowPath = Path();
+    arrowPath.moveTo(30, 4);
+    arrowPath.lineTo(34, 8);
+    arrowPath.lineTo(38, 4);
+    arrowPath.lineTo(34, 0);
+    arrowPath.close();
+    
+    canvas.drawPath(arrowPath, arrowPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class HomeTab extends StatefulWidget {
+  const HomeTab({super.key, required this.student});
+
+  final Student student;
+
+  @override
+  State<HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<HomeTab> {
+  List<Course> _courses = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+  ContactInfo _contactInfo = ContactInfo.getDefault();
+  bool _isLoadingContact = true;
+  List<Testimonial> _testimonials = [];
+  bool _isLoadingTestimonials = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCourses();
+    _loadContactInfo();
+    _loadTestimonials();
+  }
+
+  Future<void> _loadContactInfo() async {
+    try {
+      final contactInfo = await ContactService.getContactInfo();
+      if (mounted) {
+        setState(() {
+          _contactInfo = contactInfo;
+          _isLoadingContact = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading contact info: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingContact = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadTestimonials() async {
+    try {
+      debugPrint('🔄 Loading testimonials...');
+      final testimonials = await TestimonialService.fetchTestimonials();
+      debugPrint('📊 Loaded ${testimonials.length} testimonials');
+      if (mounted) {
+        setState(() {
+          _testimonials = testimonials;
+          _isLoadingTestimonials = false;
+        });
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error loading testimonials: $e');
+      debugPrint('   Stack trace: $stackTrace');
+      if (mounted) {
+        setState(() {
+_isLoadingTestimonials = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadCourses() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final courses = await CourseService.fetchCourses();
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          if (courses.isEmpty) {
+            // API returned no valid courses (likely only placeholders)
+            _errorMessage = 'API connected but no courses available yet. Showing sample courses.';
+            _courses = courseCatalog; // Fallback to hardcoded courses
+            debugPrint('ℹ️ Using fallback courses: ${courseCatalog.length} courses');
+          } else {
+            _courses = courses;
+            _errorMessage = null;
+            debugPrint('✅ Displaying ${courses.length} courses from API');
+          }
+        });
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error loading courses in UI: $e');
+      debugPrint('   Stack trace: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load courses from API. Showing sample courses.';
+          _isLoading = false;
+          // Fallback to hardcoded courses if API fails
+          _courses = courseCatalog;
+          debugPrint('ℹ️ Using fallback courses due to error: ${courseCatalog.length} courses');
+        });
+      }
+    }
+  }
+
+  Future<void> _launchUrl(Uri url) async {
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    } else {
+      debugPrint('Could not launch $url');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allCourses = _courses.isEmpty ? courseCatalog : _courses;
+    final courses = allCourses.length > 4 ? allCourses.take(4).toList() : List<Course>.from(allCourses);
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        // App Bar
+        SliverAppBar(
+          pinned: true,
+          backgroundColor: Colors.white,
+          leading: kIsWeb ? null : Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu, color: Colors.black),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ),
+          elevation: kIsWeb ? 0 : 0,
+          shadowColor: Colors.transparent,
+          flexibleSpace: kIsWeb ? Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.grey[200]!,
+                  width: 1,
+                ),
+              ),
+            ),
+          ) : null,
+          title: Image.asset(
+            'assets/images/natdemy_logo.png',
+            height: 45,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              debugPrint('Error loading logo image: $error');
+              // Fallback if image not found - show text version
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: kIsWeb ? 48 : 40,
+                        height: kIsWeb ? 50 : 40,
+                        child: CustomPaint(
+                          painter: _NatdemyLogoPainter(),
+                        ),
+                      ),
+                      SizedBox(width: kIsWeb ? 16 : 12),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            'NATD',
+                            style: TextStyle(
+                              color: const Color(0xFF1E293B),
+                              fontWeight: FontWeight.w900,
+                              fontSize: kIsWeb ? 28 : 24,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          Container(
+                            margin: EdgeInsets.symmetric(horizontal: kIsWeb ? 6 : 4),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: kIsWeb ? 12 : 10,
+                                  height: kIsWeb ? 4 : 3.5,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFA1C95C),
+                                    borderRadius: BorderRadius.circular(1.5),
+                                  ),
+                                ),
+                                SizedBox(height: kIsWeb ? 4 : 3),
+                                Container(
+                                  width: kIsWeb ? 16 : 14,
+                                  height: kIsWeb ? 4 : 3.5,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFA1C95C),
+                                    borderRadius: BorderRadius.circular(1.5),
+                                  ),
+                                ),
+                                SizedBox(height: kIsWeb ? 4 : 3),
+                                Container(
+                                  width: kIsWeb ? 12 : 10,
+                                  height: kIsWeb ? 4 : 3.5,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFA1C95C),
+                                    borderRadius: BorderRadius.circular(1.5),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            'MY',
+                            style: TextStyle(
+                              color: const Color(0xFF1E293B),
+                              fontWeight: FontWeight.w900,
+                              fontSize: kIsWeb ? 28 : 24,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: kIsWeb ? 6 : 3),
+                  Text(
+                    'Any Time Any Where',
+                    style: TextStyle(
+                      color: const Color(0xFF64748B),
+                      fontSize: kIsWeb ? 13 : 11,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          centerTitle: true,
+        ),
+
+        // Banner Carousel Section
+        SliverToBoxAdapter(
+          child: Responsive.constrainWidth(
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                kIsWeb ? Responsive.getHorizontalPadding(context) : 16,
+                kIsWeb ? 40 : 16,
+                kIsWeb ? Responsive.getHorizontalPadding(context) : 16,
+                kIsWeb ? 32 : 16,
+              ),
+            child: Container(
+              constraints: BoxConstraints(
+                minHeight: kIsWeb ? 340 : 220,
+              ),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(kIsWeb ? 32 : 20),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF582DB0).withOpacity(0.25),
+                    blurRadius: kIsWeb ? 28 : 12,
+                    spreadRadius: kIsWeb ? 2 : 0,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      kIsWeb ? 48 : 28,
+                      kIsWeb ? 32 : 24,
+                      kIsWeb ? 200 : 140,
+                      kIsWeb ? 32 : 24,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                      Text(
+                          'NATDEMY',
+                          style: TextStyle(
+                          color: const Color(0xFFA1C95C),
+                          fontSize: kIsWeb ? 56 : 42,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      SizedBox(height: kIsWeb ? 4 : 1),
+                      Text(
+                          'Any Time Any Where',
+                          style: TextStyle(
+                            color: Colors.white70,
+                          fontSize: kIsWeb ? 20 : 16,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.5,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      SizedBox(height: kIsWeb ? 16 : 8),
+                        Text(
+                          'Welcome, ${widget.student.name.isEmpty ? 'Student' : widget.student.name} 👋',
+                        style: TextStyle(
+                          color: const Color(0xFFA1C95C),
+                          fontSize: kIsWeb ? 28 : 22,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      SizedBox(height: kIsWeb ? 8 : 4),
+                      Text(
+                          'Your learning journey starts here',
+                          style: TextStyle(
+                            color: Colors.white70,
+                          fontSize: kIsWeb ? 20 : 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    right: kIsWeb ? 32 : 16,
+                    top: kIsWeb ? 24 : 16,
+                    bottom: kIsWeb ? 24 : 16,
+                    child: Opacity(
+                      opacity: 0.3,
+                      child: Image.asset(
+                        'assets/images/natdemy_logo2.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              ),
+            ),
+          ),
+        ),
+
+        // Courses Header
+        SliverToBoxAdapter(
+          child: Responsive.constrainWidth(
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                Responsive.getHorizontalPadding(context),
+                16,
+                Responsive.getHorizontalPadding(context),
+                8,
+              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'POPULAR COURSES',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: kIsWeb ? 28 : null,
+                  ),
+                ),
+                Row(
+                  children: [
+                    if (_isLoading)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else if (_errorMessage == null)
+                      IconButton(
+                        icon: const Icon(Icons.refresh, size: 20),
+                        onPressed: _loadCourses,
+                        tooltip: 'Refresh courses',
+                      ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const AllCoursesPage()),
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF000000),
+                        textStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      child: const Text('See All'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            ),
+          ),
+        ),
+
+        // Error Message
+        if (_errorMessage != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Card(
+                color: Colors.orange.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: TextStyle(color: Colors.orange.shade900, fontSize: 14),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _loadCourses,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        // Courses Grid
+        if (_isLoading && courses.isEmpty)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          )
+        else if (courses.isEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.school_outlined, size: 64, color: Colors.grey[400]),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No courses available',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: Responsive.getHorizontalPadding(context)),
+            sliver: SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: Responsive.getGridColumns(context),
+                mainAxisSpacing: Responsive.getCardSpacing(context),
+                crossAxisSpacing: Responsive.getCardSpacing(context),
+                childAspectRatio: kIsWeb ? 0.75 : 1.15,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (BuildContext context, int index) {
+                  final c = courses[index];
+                  return _CourseCard(course: c);
+                },
+                childCount: courses.length,
+              ),
+            ),
+          ),
+
+        // Contact Section Header
+        SliverToBoxAdapter(
+          child: Responsive.constrainWidth(
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                Responsive.getHorizontalPadding(context),
+                32,
+                Responsive.getHorizontalPadding(context),
+                8,
+              ),
+            child: Text(
+              'NEED ASSISTANCE?',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+                fontSize: kIsWeb ? 28 : null,
+              ),
+            ),
+            ),
+          ),
+        ),
+
+        // Contact and WhatsApp Cards Section (Side by Side on Web)
+        SliverToBoxAdapter(
+          child: Responsive.constrainWidth(
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                Responsive.getHorizontalPadding(context),
+                16,
+                Responsive.getHorizontalPadding(context),
+                16,
+              ),
+              child: kIsWeb ? Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                // Contact Card
+                Expanded(
+            child: Card(
+                    elevation: kIsWeb ? 4 : 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
+                    ),
+              child: Container(
+                decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Padding(
+                        padding: EdgeInsets.all(kIsWeb ? 32 : 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                                  padding: EdgeInsets.all(kIsWeb ? 16 : 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                            ),
+                                  child: Icon(
+                                    Icons.support_agent,
+                                    color: Colors.white,
+                                    size: kIsWeb ? 28 : 24,
+                          ),
+                                ),
+                                SizedBox(width: kIsWeb ? 16 : 12),
+                                Expanded(
+                            child: Text(
+                              'Get in Touch',
+                              style: TextStyle(
+                                color: Colors.white,
+                                      fontSize: kIsWeb ? 26 : 22,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                            SizedBox(height: kIsWeb ? 20 : 16),
+                            Text(
+                        'Our support team is here to help you 24/7. Reach out anytime for assistance with your learning journey.',
+                        style: TextStyle(
+                          color: Colors.white70,
+                                fontSize: kIsWeb ? 16 : 14,
+                          height: 1.5,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                            SizedBox(height: kIsWeb ? 32 : 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _contactInfo.phone != null ? () async {
+                            final phone = _contactInfo.phone!.replaceAll(RegExp(r'[^0-9+]'), '');
+                            final uri = Uri(scheme: 'tel', path: phone);
+                            await _launchUrl(uri);
+                          } : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: kIsWeb ? 20 : 16,
+                                    horizontal: kIsWeb ? 24 : 16,
+                                  ),
+                            shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                              side: const BorderSide(color: Color(0xFF582DB0), width: 1),
+                            ),
+                          ),
+                                icon: Icon(
+                                  Icons.phone_outlined,
+                                  size: kIsWeb ? 24 : 20,
+                                  color: Colors.white,
+                                ),
+                          label: Text(
+                            _contactInfo.phone != null ? 'Call ${_contactInfo.phone}' : 'Phone not available',
+                                  style: TextStyle(
+                                    fontSize: kIsWeb ? 18 : 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _contactInfo.whatsappNumber != null ? () async {
+                            final whatsappNum = _contactInfo.whatsappNumber!.replaceAll(RegExp(r'[^0-9+]'), '');
+                            final uri = Uri.parse('https://wa.me/$whatsappNum?text=Hello%20Natdemy%20support');
+                            await _launchUrl(uri);
+                          } : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: kIsWeb ? 20 : 16,
+                                    horizontal: kIsWeb ? 24 : 16,
+                                  ),
+                            shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                              side: const BorderSide(color: Color(0xFF582DB0), width: 1),
+                            ),
+                          ),
+                                icon: FaIcon(
+                                  FontAwesomeIcons.whatsapp,
+                                  size: kIsWeb ? 24 : 20,
+                                  color: Colors.white,
+                                ),
+                                label: Text(
+                            'Chat on WhatsApp',
+                                  style: TextStyle(
+                                    fontSize: kIsWeb ? 18 : 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+                // Spacing between cards
+                SizedBox(width: kIsWeb ? 24 : 0),
+        // WhatsApp Group Card
+                Expanded(
+            child: Card(
+                    elevation: kIsWeb ? 10 : 8,
+              shadowColor: Colors.black.withOpacity(0.15),
+              shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
+                      side: BorderSide(
+                        color: const Color(0xFF582DB0),
+                        width: kIsWeb ? 2.5 : 2,
+                ),
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF25D366), Color(0xFF128C7E)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Padding(
+                        padding: EdgeInsets.all(kIsWeb ? 32 : 24),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                                  padding: EdgeInsets.all(kIsWeb ? 16 : 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                            ),
+                                  child: FaIcon(
+                              FontAwesomeIcons.whatsapp,
+                              color: Colors.white,
+                                    size: kIsWeb ? 32 : 28,
+                            ),
+                          ),
+                                SizedBox(width: kIsWeb ? 20 : 16),
+                                Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Join Our Community',
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                          fontSize: kIsWeb ? 26 : 22,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                      SizedBox(height: kIsWeb ? 6 : 4),
+                                Text(
+                                  'Connect with fellow learners',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                          fontSize: kIsWeb ? 16 : 14,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                            SizedBox(height: kIsWeb ? 24 : 20),
+                            Text(
+                        'Join our WhatsApp group to get updates, share knowledge, and connect with other students on their learning journey.',
+                        style: TextStyle(
+                          color: Colors.white,
+                                fontSize: kIsWeb ? 16 : 14,
+                          height: 1.5,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                            SizedBox(height: kIsWeb ? 24 : 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _contactInfo.whatsappGroupLink != null ? () async {
+                            final uri = Uri.parse(_contactInfo.whatsappGroupLink!);
+                            await _launchUrl(uri);
+                          } : null,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF25D366),
+                            elevation: 0,
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: kIsWeb ? 20 : 16,
+                                    horizontal: kIsWeb ? 24 : 16,
+                                  ),
+                            shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                                  ),
+                                ),
+                                icon: FaIcon(
+                                  FontAwesomeIcons.whatsapp,
+                                  size: kIsWeb ? 24 : 20,
+                                ),
+                                label: Text(
+                            'Join WhatsApp Group',
+                            style: TextStyle(
+                                    fontSize: kIsWeb ? 18 : 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+              ],
+            ) : Column(
+              children: [
+                // Contact Card
+                Card(
+                  elevation: kIsWeb ? 4 : 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(kIsWeb ? 32 : 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(kIsWeb ? 16 : 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                                ),
+                                child: Icon(
+                                  Icons.support_agent,
+                                  color: Colors.white,
+                                  size: kIsWeb ? 28 : 24,
+                                ),
+                              ),
+                              SizedBox(width: kIsWeb ? 16 : 12),
+                              Expanded(
+                                child: Text(
+                                  'Get in Touch',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: kIsWeb ? 26 : 22,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: kIsWeb ? 20 : 16),
+                          Text(
+                            'Our support team is here to help you 24/7. Reach out anytime for assistance with your learning journey.',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: kIsWeb ? 16 : 14,
+                              height: 1.5,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: kIsWeb ? 32 : 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _contactInfo.phone != null ? () async {
+                                final phone = _contactInfo.phone!.replaceAll(RegExp(r'[^0-9+]'), '');
+                                final uri = Uri(scheme: 'tel', path: phone);
+                                await _launchUrl(uri);
+                              } : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white.withOpacity(0.2),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: EdgeInsets.symmetric(
+                                  vertical: kIsWeb ? 20 : 16,
+                                  horizontal: kIsWeb ? 24 : 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                                  side: const BorderSide(color: Color(0xFF582DB0), width: 1),
+                                ),
+                              ),
+                              icon: Icon(
+                                Icons.phone_outlined,
+                                size: kIsWeb ? 24 : 20,
+                                color: Colors.white,
+                              ),
+                              label: Text(
+                                _contactInfo.phone != null ? 'Call ${_contactInfo.phone}' : 'Phone not available',
+                                style: TextStyle(
+                                  fontSize: kIsWeb ? 18 : 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _contactInfo.whatsappNumber != null ? () async {
+                                final whatsappNum = _contactInfo.whatsappNumber!.replaceAll(RegExp(r'[^0-9+]'), '');
+                                final uri = Uri.parse('https://wa.me/$whatsappNum?text=Hello%20Natdemy%20support');
+                                await _launchUrl(uri);
+                              } : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white.withOpacity(0.2),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: EdgeInsets.symmetric(
+                                  vertical: kIsWeb ? 20 : 16,
+                                  horizontal: kIsWeb ? 24 : 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                                  side: const BorderSide(color: Color(0xFF582DB0), width: 1),
+                                ),
+                              ),
+                              icon: FaIcon(
+                                FontAwesomeIcons.whatsapp,
+                                size: kIsWeb ? 24 : 20,
+                                color: Colors.white,
+                              ),
+                              label: Text(
+                                'Chat on WhatsApp',
+                                style: TextStyle(
+                                  fontSize: kIsWeb ? 18 : 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // WhatsApp Group Card
+                Card(
+                  elevation: kIsWeb ? 10 : 8,
+                  shadowColor: Colors.black.withOpacity(0.15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
+                    side: BorderSide(
+                      color: const Color(0xFF582DB0),
+                      width: kIsWeb ? 2.5 : 2,
+                    ),
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF25D366), Color(0xFF128C7E)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(kIsWeb ? 32 : 24),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(kIsWeb ? 16 : 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                                ),
+                                child: FaIcon(
+                                  FontAwesomeIcons.whatsapp,
+                                  color: Colors.white,
+                                  size: kIsWeb ? 32 : 28,
+                                ),
+                              ),
+                              SizedBox(width: kIsWeb ? 20 : 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Join Our Community',
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        fontSize: kIsWeb ? 26 : 22,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    SizedBox(height: kIsWeb ? 6 : 4),
+                                    Text(
+                                      'Connect with fellow learners',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: kIsWeb ? 16 : 14,
+                                        fontWeight: FontWeight.w400,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: kIsWeb ? 24 : 20),
+                          Text(
+                            'Join our WhatsApp group to get updates, share knowledge, and connect with other students on their learning journey.',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: kIsWeb ? 16 : 14,
+                              height: 1.5,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: kIsWeb ? 24 : 20),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: _contactInfo.whatsappGroupLink != null ? () async {
+                                final uri = Uri.parse(_contactInfo.whatsappGroupLink!);
+                                await _launchUrl(uri);
+                              } : null,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: const Color(0xFF25D366),
+                                elevation: 0,
+                                padding: EdgeInsets.symmetric(
+                                  vertical: kIsWeb ? 20 : 16,
+                                  horizontal: kIsWeb ? 24 : 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                                ),
+                              ),
+                              icon: FaIcon(
+                                FontAwesomeIcons.whatsapp,
+                                size: kIsWeb ? 24 : 20,
+                              ),
+                              label: Text(
+                                'Join WhatsApp Group',
+                                style: TextStyle(
+                                  fontSize: kIsWeb ? 18 : 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            ),
+          ),
+        ),
+
+        // Testimonials Section - At the End
+        SliverToBoxAdapter(
+          child: Responsive.constrainWidth(
+            Container(
+              margin: EdgeInsets.only(
+                top: 48,
+                bottom: 24,
+                left: Responsive.getHorizontalPadding(context),
+                right: Responsive.getHorizontalPadding(context),
+              ),
+            child: Column(
+              children: [
+                // Section Header
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF582DB0),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Student Testimonials',
+                        style: TextStyle(
+                          fontSize: kIsWeb ? 26 : 22,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF1E293B),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Testimonials Carousel
+                if (_isLoadingTestimonials)
+                  const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_testimonials.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.format_quote, size: 48, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No testimonials available yet',
+                            style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: _testimonials.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 20),
+                    itemBuilder: (context, index) {
+                      final testimonial = _testimonials[index];
+                      return MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(kIsWeb ? 0.08 : 0.05),
+                                blurRadius: kIsWeb ? 16 : 10,
+                                spreadRadius: kIsWeb ? 1 : 0,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.all(kIsWeb ? 28 : 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Top Row: Profile (left) and Rating (right)
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Profile Info - Top Left
+                                  Row(
+                                    children: [
+                                      // Profile Image
+                                      CircleAvatar(
+                                        radius: kIsWeb ? 24 : 20,
+                                        backgroundColor: const Color(0xFF582DB0),
+                                        backgroundImage: testimonial.imageUrl != null &&
+                                                testimonial.imageUrl!.isNotEmpty
+                                            ? NetworkImage(testimonial.imageUrl!)
+                                            : null,
+                                        child: testimonial.imageUrl == null ||
+                                                testimonial.imageUrl!.isEmpty
+                                            ? Text(
+                                                testimonial.name.isNotEmpty
+                                                    ? testimonial.name[0].toUpperCase()
+                                                    : '?',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: kIsWeb ? 18 : 16,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                      SizedBox(width: kIsWeb ? 16 : 12),
+                                      // Name and Department
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            testimonial.name,
+                                            style: TextStyle(
+                                              fontSize: kIsWeb ? 16 : 14,
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF1E293B),
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (testimonial.department != null &&
+                                              testimonial.department!.isNotEmpty)
+                                            Text(
+                                              testimonial.department!,
+                                              style: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: kIsWeb ? 13 : 12,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  // Rating - Top Right
+                                  RatingStars(
+                                    rating: testimonial.rating.toDouble(),
+                                    starSize: kIsWeb ? 18 : 16,
+                                    showValue: false,
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              // Testimonial Text - Full text at bottom
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Left Quote Icon
+                                  Container(
+                                    padding: EdgeInsets.all(kIsWeb ? 10 : 8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF582DB0).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(kIsWeb ? 14 : 12),
+                                    ),
+                                    child: Icon(
+                                      Icons.format_quote,
+                                      color: const Color(0xFF582DB0),
+                                      size: kIsWeb ? 28 : 24,
+                                    ),
+                                  ),
+                                  SizedBox(width: kIsWeb ? 16 : 12),
+                                  // Text Content
+                                  Expanded(
+                                    child: Text(
+                                      testimonial.content,
+                                      style: TextStyle(
+                                        fontSize: kIsWeb ? 16 : 14,
+                                        color: Colors.grey[800],
+                                        height: 1.7,
+                                        fontWeight: FontWeight.w400,
+                                        letterSpacing: 0.2,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: kIsWeb ? 16 : 12),
+                                  // Right Quote Icon
+                                  Container(
+                                    padding: EdgeInsets.all(kIsWeb ? 10 : 8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF582DB0).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(kIsWeb ? 14 : 12),
+                                    ),
+                                    child: Transform.rotate(
+                                      angle: 3.14159, // 180 degrees
+                                      child: Icon(
+                                        Icons.format_quote,
+                                        color: const Color(0xFF582DB0),
+                                        size: kIsWeb ? 28 : 24,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            ),
+          ),
+
+        SliverToBoxAdapter(
+          child: SizedBox(height: kIsWeb ? 40 : MediaQuery.of(context).padding.bottom + 100),
+        ),
+      ],
+    );
+  }
+}
+
+class _CourseCard extends StatelessWidget {
+  const _CourseCard({required this.course});
+  final Course course;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: kIsWeb ? 6 : 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
+        side: BorderSide(
+          color: const Color(0xFF582DB0),
+          width: kIsWeb ? 2.5 : 2,
+        ),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => CourseDetailPage(course: course),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
+        child: MouseRegion(
+          cursor: kIsWeb ? SystemMouseCursors.click : MouseCursor.defer,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: EdgeInsets.all(kIsWeb ? 24 : 12),
+          decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
+            color: Colors.white,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              course.thumbnailUrl != null && course.thumbnailUrl!.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(kIsWeb ? 14 : 10),
+                      child: Image.network(
+                        CourseService.getFullImageUrl(course.thumbnailUrl),
+                        width: kIsWeb ? 96 : 68,
+                        height: kIsWeb ? 96 : 68,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(
+                            CourseUtils.getCourseIcon(course.title),
+                            color: const Color(0xFFA1C95C),
+                            size: kIsWeb ? 76 : 54,
+                          );
+                        },
+                      ),
+                    )
+                  : Icon(
+                      CourseUtils.getCourseIcon(course.title),
+                      color: const Color(0xFFA1C95C),
+                      size: kIsWeb ? 76 : 54,
+                    ),
+              SizedBox(height: kIsWeb ? 14 : 10),
+              Flexible(
+                child: Text(
+                  course.title,
+                  textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: kIsWeb ? 18 : 15,
+                    fontWeight: FontWeight.bold,
+                      color: const Color(0xFF000000),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+                SizedBox(height: kIsWeb ? 8 : 6),
+              RatingStars(
+                rating: course.rating,
+                  textStyle: TextStyle(
+                    color: const Color(0xFF000000),
+                    fontSize: kIsWeb ? 14 : 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+
+class _ContactItem extends StatelessWidget {
+  const _ContactItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.2),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right,
+              color: Colors.white70,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+class ProfileTab extends StatefulWidget {
+  const ProfileTab({super.key, required this.student, required this.onProfileUpdated});
+
+  final Student student;
+  final Function(Student) onProfileUpdated;
+
+  @override
+  State<ProfileTab> createState() => _ProfileTabState();
+}
+
+class _ProfileTabState extends State<ProfileTab> {
+  late Student _student;
+
+  @override
+  void initState() {
+    super.initState();
+    _student = widget.student;
+  }
+
+  @override
+  void didUpdateWidget(ProfileTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(_student, widget.student)) {
+      _student = widget.student;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final student = _student;
+
+    return Scaffold(
+      drawer: MainDrawer(
+        student: student,
+        onNavigateToHome: () {
+          // Navigate to HomeShell and switch to Home tab
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => HomeShell(student: student),
+            ),
+          );
+        },
+        onNavigateToMyCourses: () {
+          // Navigate to HomeShell and switch to My Courses tab
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => HomeShell(student: student),
+            ),
+          );
+        },
+        onNavigateToProfile: () {
+          // Already on Profile page
+        },
+      ),
+      appBar: AppBar(
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu, color: Colors.black),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
+        title: const Text(
+          'PROFILE',
+          style: TextStyle(
+            color: Color(0xFF582DB0),
+            fontWeight: FontWeight.w900,
+            fontSize: 20,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).padding.bottom + 100,
+        ),
+        child: Column(
+          children: [
+            // Profile Header Card
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF582DB0).withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                    ),
+                    child: CircleAvatar(
+                      radius: 40,
+                      backgroundColor: Colors.white,
+                      backgroundImage: ImageUtils.getProfileImageProvider(student.profileImagePath),
+                      child: ImageUtils.hasProfileImage(student.profileImagePath)
+                          ? null
+                          : const Icon(Icons.person, size: 40, color: Color(0xFF582DB0)),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          student.name.isEmpty ? 'Student' : student.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          student.email,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
+                          ),
+                        ),
+                        if (student.phone.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.phone_outlined,
+                                size: 16,
+                                color: Colors.white70,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                student.phone,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Profile Edit Section
+            _ProfileSection(
+              title: 'Account',
+              children: [
+                _ProfileMenuItem(
+                  icon: Icons.edit_outlined,
+                  title: 'Edit Profile',
+                  subtitle: 'Update your personal information',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => EditProfileScreen(
+                          student: student,
+                          onProfileUpdated: widget.onProfileUpdated,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+
+            // Settings Section
+            _ProfileSection(
+              title: 'Settings',
+              children: [
+                _ProfileMenuItem(
+                  icon: Icons.notifications_outlined,
+                  title: 'Notifications',
+                  subtitle: 'Manage notification preferences',
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Notification settings coming soon!'),
+                        backgroundColor: Color(0xFF582DB0),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+
+            // Support Section
+            _ProfileSection(
+              title: 'Support',
+              children: [
+                _ProfileMenuItem(
+                  icon: Icons.info_outline,
+                  title: 'About Natdemy',
+                  subtitle: 'Version 1.0.0',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const AboutPage(),
+                      ),
+                    );
+                  },
+                ),
+                _ProfileMenuItem(
+                  icon: Icons.privacy_tip_outlined,
+                  title: 'Privacy Policy',
+                  subtitle: 'Read our privacy policy',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PrivacyPolicyPage(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+
+            // Sign Out Button
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Sign Out'),
+                        content: const Text('Are you sure you want to sign out?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            onPressed: () async {
+                              await JoinedCourses.instance.clear();
+                              await AuthHelper.clearLoginData();
+                              if (!context.mounted) return;
+                              Navigator.of(context).pop();
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                                (route) => false,
+                              );
+                            },
+                            child: const Text('Sign Out'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFEF4444), width: 2),
+                    foregroundColor: const Color(0xFFEF4444),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.logout, size: 20),
+                  label: const Text(
+                    'Sign Out',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileSection extends StatelessWidget {
+  const _ProfileSection({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1E293B),
+                ),
+          ),
+        ),
+        Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          elevation: 1,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Column(
+            children: children,
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+}
+
+class _ProfileMenuItem extends StatelessWidget {
+  const _ProfileMenuItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF582DB0).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: const Color(0xFF582DB0), size: 20),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: Colors.grey[400], size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}

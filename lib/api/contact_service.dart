@@ -40,9 +40,9 @@ class ContactInfo {
   static ContactInfo getDefault() {
     return const ContactInfo(
       email: 'support@natdemy.com',
-      phone: '+91 89435 53164',
-      whatsappNumber: '918943553164',
-      whatsappGroupLink: 'https://chat.whatsapp.com/YourGroupLink',
+      phone: '+91 92076 66621',
+      whatsappNumber: '9192076666621',
+      whatsappGroupLink: 'https://chat.whatsapp.com/LpNUsxNbGPq4eFgVgFGSL2?mode=wwt',
       website: 'www.natdemy.com',
     );
   }
@@ -65,7 +65,121 @@ class ContactService {
     }
 
     try {
-      debugPrint('🔄 Fetching contact information from API...');
+      // Try contactus API endpoint first (from admin contactus page)
+      debugPrint('🔄 Fetching contact information from contactus API...');
+      try {
+        final contactusResponse = await ApiClient.get('/api/web/contactus/', queryParams: {'format': 'json'}, includeAuth: false);
+        
+        if (contactusResponse.statusCode == 200) {
+          final isHtml = contactusResponse.body.trim().startsWith('<!DOCTYPE') || 
+                         contactusResponse.body.trim().startsWith('<html') ||
+                         contactusResponse.body.trim().startsWith('<HTML');
+          
+          if (!isHtml) {
+            try {
+              final Map<String, dynamic> contactusData = json.decode(contactusResponse.body);
+              debugPrint('✅ Contactus API response received');
+              
+              // Handle different response structures
+              ContactInfo? contactInfo;
+              
+              if (contactusData.containsKey('data') && contactusData['data'] is Map) {
+                contactInfo = ContactInfo.fromJson(contactusData['data'] as Map<String, dynamic>);
+              } else if (contactusData.containsKey('contacts') && contactusData['contacts'] is List) {
+                final contacts = contactusData['contacts'] as List<dynamic>;
+                if (contacts.isNotEmpty) {
+                  contactInfo = ContactInfo.fromJson(contacts[0] as Map<String, dynamic>);
+                }
+              } else if (contactusData.containsKey('contact') && contactusData['contact'] is Map) {
+                contactInfo = ContactInfo.fromJson(contactusData['contact'] as Map<String, dynamic>);
+              } else {
+                contactInfo = ContactInfo.fromJson(contactusData);
+              }
+              
+              if (contactInfo != null && (contactInfo.phone != null || contactInfo.whatsappNumber != null)) {
+                _cachedContactInfo = contactInfo;
+                _cacheTime = DateTime.now();
+                debugPrint('✅ Contact info loaded from contactus API: email=${contactInfo.email}, phone=${contactInfo.phone}');
+                return contactInfo;
+              }
+            } catch (e) {
+              debugPrint('⚠️ Error parsing contactus API response: $e');
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ Contactus API failed, trying home API: $e');
+      }
+      
+      // Try home API to get contact info from data.contacts or data.whatsapp
+      debugPrint('🔄 Fetching contact information from home API...');
+      try {
+        final homeResponse = await ApiClient.get('/api/home/', queryParams: {'format': 'json'}, includeAuth: false);
+        
+        if (homeResponse.statusCode == 200) {
+          final Map<String, dynamic> homeData = json.decode(homeResponse.body);
+          
+          if (homeData.containsKey('data') && homeData['data'] is Map) {
+            final dataMap = homeData['data'] as Map<String, dynamic>;
+            
+            // Check for contacts array in home API
+            if (dataMap.containsKey('contacts') && dataMap['contacts'] is List) {
+              final contacts = dataMap['contacts'] as List<dynamic>;
+              if (contacts.isNotEmpty) {
+                debugPrint('✅ Found contacts in home API');
+                final contactData = contacts[0] as Map<String, dynamic>;
+                final contactInfo = ContactInfo.fromJson(contactData);
+                
+                // Cache and return
+                _cachedContactInfo = contactInfo;
+                _cacheTime = DateTime.now();
+                debugPrint('✅ Contact info loaded from home API: email=${contactInfo.email}, phone=${contactInfo.phone}');
+                return contactInfo;
+              }
+            }
+            
+            // Check for whatsapp array in home API (fallback)
+            if (dataMap.containsKey('whatsapp') && dataMap['whatsapp'] is List) {
+              final whatsappList = dataMap['whatsapp'] as List<dynamic>;
+              if (whatsappList.isNotEmpty) {
+                debugPrint('✅ Found whatsapp data in home API');
+                final whatsappData = whatsappList[0] as Map<String, dynamic>;
+                final whatsappNumber = whatsappData['number']?.toString();
+                
+                // Extract phone number from whatsapp number if available
+                String? phoneNumber;
+                String? whatsappNum;
+                if (whatsappNumber != null) {
+                  // Remove spaces and format
+                  final cleaned = whatsappNumber.replaceAll(RegExp(r'[^0-9+]'), '');
+                  whatsappNum = cleaned;
+                  phoneNumber = whatsappNumber; // Keep formatted version for display
+                }
+                
+                // Create ContactInfo from whatsapp data
+                final contactInfo = ContactInfo(
+                  phone: phoneNumber,
+                  whatsappNumber: whatsappNum,
+                  whatsappGroupLink: ContactInfo.getDefault().whatsappGroupLink,
+                  email: ContactInfo.getDefault().email,
+                  website: ContactInfo.getDefault().website,
+                );
+                
+                // Cache and return
+                _cachedContactInfo = contactInfo;
+                _cacheTime = DateTime.now();
+                debugPrint('✅ Contact info loaded from home API whatsapp: phone=${contactInfo.phone}, whatsapp=${contactInfo.whatsappNumber}');
+                return contactInfo;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ Home API failed, trying contact endpoint: $e');
+      }
+      
+      // Fallback to contact API endpoint
+      debugPrint('🔄 Fetching contact information from contact API...');
       final response = await ApiClient.get('/api/contact/', queryParams: {'format': 'json'}, includeAuth: false);
 
       // Check if response is HTML (error page) instead of JSON

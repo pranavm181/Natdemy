@@ -14,6 +14,48 @@ class CourseDetailPage extends StatelessWidget {
 
   final Course course;
 
+  // Get icon for stream based on stream name or index
+  IconData _getStreamIcon(String streamName, int index) {
+    final nameLower = streamName.toLowerCase();
+    
+    // Check stream name for keywords
+    if (nameLower.contains('science') || nameLower.contains('physics') || nameLower.contains('chemistry') || nameLower.contains('biology')) {
+      return Icons.science;
+    } else if (nameLower.contains('math') || nameLower.contains('mathematics')) {
+      return Icons.calculate;
+    } else if (nameLower.contains('english') || nameLower.contains('language')) {
+      return Icons.menu_book;
+    } else if (nameLower.contains('computer') || nameLower.contains('programming') || nameLower.contains('coding')) {
+      return Icons.computer;
+    } else if (nameLower.contains('commerce') || nameLower.contains('business') || nameLower.contains('accounting')) {
+      return Icons.account_balance;
+    } else if (nameLower.contains('arts') || nameLower.contains('history') || nameLower.contains('geography')) {
+      return Icons.palette;
+    } else if (nameLower.contains('medical') || nameLower.contains('health')) {
+      return Icons.medical_services;
+    } else if (nameLower.contains('engineering') || nameLower.contains('tech')) {
+      return Icons.engineering;
+    } else if (nameLower.contains('law') || nameLower.contains('legal')) {
+      return Icons.gavel;
+    } else if (nameLower.contains('management') || nameLower.contains('mba')) {
+      return Icons.business_center;
+    }
+    
+    // Default icons based on index if no keyword matches
+    final defaultIcons = [
+      Icons.stream,
+      Icons.school,
+      Icons.library_books,
+      Icons.auto_stories,
+      Icons.workspace_premium,
+      Icons.rocket_launch,
+      Icons.lightbulb,
+      Icons.trending_up,
+    ];
+    
+    return defaultIcons[index % defaultIcons.length];
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -185,6 +227,7 @@ class CourseDetailPage extends StatelessWidget {
                         itemBuilder: (context, index) {
                           final stream = relatedStreams[index];
                           final streamCourse = stream.course ?? course;
+                          final streamIcon = _getStreamIcon(stream.name, index);
 
                           return Container(
                             width: 220,
@@ -206,17 +249,36 @@ class CourseDetailPage extends StatelessWidget {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    streamCourse?.title ?? course.title,
-                                    style: const TextStyle(
-                                      color: Color(0xFF475569),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                ),
-                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF582DB0).withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Icon(
+                                          streamIcon,
+                                          color: const Color(0xFF582DB0),
+                                          size: 24,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          streamCourse?.title ?? course.title,
+                                          style: const TextStyle(
+                                            color: Color(0xFF475569),
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
                                         Text(
                                           stream.name,
                                           style: const TextStyle(

@@ -5,6 +5,7 @@ import '../data/lessons_config.dart';
 import 'materials_page.dart';
 import 'live_upcoming.dart';
 import 'lesson_detail.dart';
+import 'question_bank_page.dart';
 
 class SubjectDetailPage extends StatelessWidget {
   const SubjectDetailPage({
@@ -35,6 +36,7 @@ class SubjectDetailPage extends StatelessWidget {
             builder: (_) => MaterialsPage(
               courseTitle: courseTitle ?? chapter.title,
               courseId: chapter.courseId,
+              chapter: chapter,
             ),
           ),
         );
@@ -176,10 +178,12 @@ class SubjectDetailPage extends StatelessWidget {
             height: 56,
             child: FilledButton.icon(
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Opening question bank...'),
-                    backgroundColor: Color(0xFF582DB0),
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => QuestionBankPage(
+                      chapter: chapter,
+                      courseTitle: courseTitle ?? chapter.title,
+                    ),
                   ),
                 );
               },

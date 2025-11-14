@@ -53,6 +53,7 @@ class AuthService {
     required String studentId,
     String? photo,
     int? courseId,
+    int? streamId,
   }) async {
     // Backend requires course_id (NOT NULL constraint), so fetch a valid one if not provided
     int? finalCourseId = courseId;
@@ -78,16 +79,24 @@ class AuthService {
     final uri = Uri.parse('${ApiClient.baseUrl}$_registerEndpoint');
     final request = http.MultipartRequest('POST', uri);
 
-    request.fields.addAll({
-      'name': name,
-      'email': email,
-      'phone': phone,
+    // Prepare fields - ensure all required fields are included
+    final fields = <String, String>{
+      'name': name.trim(),
+      'email': email.trim().toLowerCase(),
+      'phone': phone.trim(),
       'password': password,
-      'student_id': studentId,
-      // Backend requires course_id (NOT NULL constraint)
-      if (finalCourseId != null) 'course_id': finalCourseId.toString(),
-    });
-
+      'student_id': studentId.trim(),
+      // Backend requires course_id (NOT NULL constraint) - always include
+      'course_id': finalCourseId.toString(),
+    };
+    
+    // Add stream_id if provided (optional field)
+    if (streamId != null) {
+      fields['stream_id'] = streamId.toString();
+    }
+    
+    request.fields.addAll(fields);
+    
     Uint8List? photoBytes;
     if (photo != null && photo.isNotEmpty) {
       try {
@@ -108,12 +117,46 @@ class AuthService {
       ),
     );
 
+    // Debug: Log what we're sending to verify data is being saved
+    debugPrint('📤 Registration Request to Student Register API:');
+    debugPrint('   Endpoint: $uri');
+    debugPrint('   Method: POST (Multipart)');
+    debugPrint('   Fields being saved:');
+    fields.forEach((key, value) {
+      debugPrint('     - $key: $value');
+    });
+    debugPrint('   Photo: Included (${photoBytes.length} bytes)');
+
     final headers = await ApiClient.getHeaders(includeAuth: false);
-    headers.remove('Content-Type');
+    headers.remove('Content-Type'); // Remove Content-Type for multipart requests
     request.headers.addAll(headers);
+
+    // Debug: Log headers
+    debugPrint('   Headers: ${request.headers}');
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
+    
+    // Debug: Log response to verify data was saved
+    debugPrint('📥 Registration Response from Student Register API:');
+    debugPrint('   Status Code: ${response.statusCode}');
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      debugPrint('   ✅ SUCCESS: Student data saved to database');
+      try {
+        final responseData = json.decode(response.body);
+        debugPrint('   Response Data: $responseData');
+        if (responseData is Map<String, dynamic>) {
+          if (responseData.containsKey('id') || responseData.containsKey('student')) {
+            debugPrint('   ✅ Student record created successfully');
+          }
+        }
+      } catch (e) {
+        debugPrint('   Response body: ${response.body}');
+      }
+    } else {
+      debugPrint('   ❌ ERROR: Failed to save student data');
+      debugPrint('   Response Body: ${response.body}');
+    }
 
     return _handleAuthResponse(response);
   }

@@ -33,7 +33,7 @@ class MainDrawer extends StatelessWidget {
             // Profile Header Card
             Container(
               margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
@@ -41,6 +41,10 @@ class MainDrawer extends StatelessWidget {
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.black,
+                  width: 2,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0xFF582DB0).withOpacity(0.3),
@@ -50,6 +54,7 @@ class MainDrawer extends StatelessWidget {
                 ],
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
                     decoration: BoxDecoration(
@@ -69,6 +74,8 @@ class MainDrawer extends StatelessWidget {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           student.name.isEmpty ? 'Student' : student.name,
@@ -76,7 +83,10 @@ class MainDrawer extends StatelessWidget {
                             color: Colors.white,
                             fontSize: 22,
                             fontWeight: FontWeight.w700,
+                            height: 1.2,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -84,7 +94,10 @@ class MainDrawer extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 16,
+                            height: 1.2,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),

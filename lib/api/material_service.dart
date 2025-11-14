@@ -81,12 +81,27 @@ class MaterialService {
                     }
                   }
                   
-                  // Get material URL
-                  String materialUrl = materialJson['url'] as String? ?? '';
-                  if (materialUrl.isNotEmpty && 
-                      !materialUrl.startsWith('http://') && 
-                      !materialUrl.startsWith('https://')) {
-                    materialUrl = '${ApiClient.baseUrl}$materialUrl';
+                  // Get material URL - handle multiple possible field names
+                  String materialUrl = materialJson['url'] as String? ?? 
+                                     materialJson['file'] as String? ?? 
+                                     materialJson['attachment'] as String? ?? 
+                                     materialJson['file_url'] as String? ?? 
+                                     '';
+                  
+                  // Ensure URL is properly formatted
+                  if (materialUrl.isNotEmpty) {
+                    // If it's a relative path, prepend base URL
+                    if (!materialUrl.startsWith('http://') && 
+                        !materialUrl.startsWith('https://')) {
+                      // Ensure it starts with /
+                      if (!materialUrl.startsWith('/')) {
+                        materialUrl = '/$materialUrl';
+                      }
+                      materialUrl = '${ApiClient.baseUrl}$materialUrl';
+                    }
+                    debugPrint('   📎 Material URL: $materialUrl');
+                  } else {
+                    debugPrint('   ⚠️ Material "${materialJson['name']}" has no URL');
                   }
                   
                   final material = CourseMaterial(
@@ -148,16 +163,21 @@ class MaterialService {
   // Get full material URL from relative path
   static String getFullMaterialUrl(String? relativePath) {
     if (relativePath == null || relativePath.isEmpty) {
+      debugPrint('⚠️ getFullMaterialUrl: Empty or null path');
       return '';
     }
     
     // If already a full URL, return as is
     if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
+      debugPrint('✅ getFullMaterialUrl: Already full URL: $relativePath');
       return relativePath;
     }
     
-    // Construct full URL
-    return '${ApiClient.baseUrl}$relativePath';
+    // Ensure relative path starts with /
+    final normalizedPath = relativePath.startsWith('/') ? relativePath : '/$relativePath';
+    final fullUrl = '${ApiClient.baseUrl}$normalizedPath';
+    debugPrint('🔗 getFullMaterialUrl: Converted "$relativePath" to "$fullUrl"');
+    return fullUrl;
   }
 }
 

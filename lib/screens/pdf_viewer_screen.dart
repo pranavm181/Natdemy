@@ -10,10 +10,12 @@ class PdfViewerScreen extends StatefulWidget {
     super.key,
     required this.pdfUrl,
     required this.pdfTitle,
+    this.allowDownload = true,
   });
 
   final String pdfUrl;
   final String pdfTitle;
+  final bool allowDownload; // If false, hides download button (view-only mode)
 
   @override
   State<PdfViewerScreen> createState() => _PdfViewerScreenState();
@@ -145,7 +147,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         ),
         backgroundColor: const Color(0xFF582DB0),
         actions: [
-          if (_pdfController != null)
+          if (_pdfController != null && widget.allowDownload)
             IconButton(
               icon: const Icon(Icons.download_outlined, color: Colors.white),
               onPressed: () async {

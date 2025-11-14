@@ -6,6 +6,7 @@ import 'package:google_nav_bar/google_nav_bar.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../data/student.dart';
 import '../data/course_catalog.dart';
+import '../data/course_stream.dart';
 import '../data/joined_courses.dart';
 import '../data/auth_helper.dart';
 import '../utils/course_utils.dart';
@@ -139,7 +140,7 @@ class _HomeShellState extends State<HomeShell> {
                 // Profile Card at Top
                 Container(
                   margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
@@ -147,6 +148,10 @@ class _HomeShellState extends State<HomeShell> {
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.black,
+                      width: 2,
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: const Color(0xFF582DB0).withOpacity(0.2),
@@ -155,9 +160,9 @@ class _HomeShellState extends State<HomeShell> {
                       ),
                     ],
                   ),
-                  child: Column(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Profile Image
                       Container(
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
@@ -172,28 +177,37 @@ class _HomeShellState extends State<HomeShell> {
                               : const Icon(Icons.person, size: 40, color: Color(0xFF582DB0)),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      // Name
-                      Text(
-                        _currentStudent.name.isEmpty ? 'Student' : _currentStudent.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _currentStudent.name.isEmpty ? 'Student' : _currentStudent.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _currentStudent.email,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 16,
+                                height: 1.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      // Email
-                      Text(
-                        _currentStudent.email,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
-                          fontSize: 13,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -411,11 +425,8 @@ class _HomeShellState extends State<HomeShell> {
                 ),
               ],
               selectedIndex: _currentIndex,
-              onTabChange: (index) async {
-                // Reload courses when My Courses tab is selected
-                if (index == 1) {
-                  await JoinedCourses.instance.initialize(_currentStudent.email);
-                }
+              onTabChange: (index) {
+                // Just change the tab - let MyCoursesScreen handle its own loading
                 setState(() => _currentIndex = index);
               },
             ),
@@ -796,102 +807,302 @@ _isLoadingTestimonials = false;
               ),
             child: Container(
               constraints: BoxConstraints(
-                minHeight: kIsWeb ? 340 : 220,
+                minHeight: kIsWeb ? 200 : 160,
               ),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF582DB0),
+                    const Color(0xFF7C3AED),
+                    const Color(0xFF8B5CF6),
+                    const Color(0xFF9333EA),
+                  ],
+                  stops: const [0.0, 0.3, 0.7, 1.0],
                 ),
                 borderRadius: BorderRadius.circular(kIsWeb ? 32 : 20),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF582DB0).withOpacity(0.25),
-                    blurRadius: kIsWeb ? 28 : 12,
-                    spreadRadius: kIsWeb ? 2 : 0,
-                    offset: const Offset(0, 4),
+                    color: const Color(0xFF582DB0).withOpacity(0.4),
+                    blurRadius: kIsWeb ? 40 : 20,
+                    spreadRadius: kIsWeb ? 3 : 2,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
-              child: Stack(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      kIsWeb ? 48 : 28,
-                      kIsWeb ? 32 : 24,
-                      kIsWeb ? 200 : 140,
-                      kIsWeb ? 32 : 24,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                      Text(
-                          'NATDEMY',
-                          style: TextStyle(
-                          color: const Color(0xFFA1C95C),
-                          fontSize: kIsWeb ? 56 : 42,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.2,
-                            fontStyle: FontStyle.italic,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(kIsWeb ? 32 : 20),
+                child: Stack(
+                  children: [
+                    // Natdemy logo in background
+                    Positioned.fill(
+                      child: Opacity(
+                        opacity: 0.15,
+                        child: Image.asset(
+                          'assets/images/natdemy_logo2.png',
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container();
+                          },
                         ),
-                      SizedBox(height: kIsWeb ? 4 : 1),
-                      Text(
-                          'Any Time Any Where',
-                          style: TextStyle(
-                            color: Colors.white70,
-                          fontSize: kIsWeb ? 20 : 16,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.5,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      SizedBox(height: kIsWeb ? 16 : 8),
-                        Text(
-                          'Welcome, ${widget.student.name.isEmpty ? 'Student' : widget.student.name} 👋',
-                        style: TextStyle(
-                          color: const Color(0xFFA1C95C),
-                          fontSize: kIsWeb ? 28 : 22,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      SizedBox(height: kIsWeb ? 8 : 4),
-                      Text(
-                          'Your learning journey starts here',
-                          style: TextStyle(
-                            color: Colors.white70,
-                          fontSize: kIsWeb ? 20 : 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    right: kIsWeb ? 32 : 16,
-                    top: kIsWeb ? 24 : 16,
-                    bottom: kIsWeb ? 24 : 16,
-                    child: Opacity(
-                      opacity: 0.3,
-                      child: Image.asset(
-                        'assets/images/natdemy_logo2.png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const SizedBox.shrink();
-                        },
                       ),
                     ),
-                  ),
-                ],
+                    // Animated gradient overlay
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topRight,
+                            end: Alignment.bottomLeft,
+                            colors: [
+                              Colors.white.withOpacity(0.1),
+                              Colors.transparent,
+                              Colors.white.withOpacity(0.05),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Decorative elements
+                    Positioned(
+                      right: -80,
+                      top: -80,
+                      child: Container(
+                        width: 250,
+                        height: 250,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              Colors.white.withOpacity(0.15),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 40,
+                      bottom: -60,
+                      child: Container(
+                        width: 150,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              const Color(0xFFA1C95C).withOpacity(0.2),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: -40,
+                      top: 40,
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.08),
+                        ),
+                      ),
+                    ),
+                    // Main content
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: kIsWeb ? 48 : 28,
+                        vertical: kIsWeb ? 20 : 12,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(25),
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFA1C95C),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.school_rounded,
+                                    color: Colors.white,
+                                    size: 12,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    'Premium Learning Platform',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: kIsWeb ? 13 : 11,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black.withOpacity(0.3),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ],
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: kIsWeb ? 8 : 8),
+                          // Main title with gradient
+                          ShaderMask(
+                            shaderCallback: (bounds) => const LinearGradient(
+                              colors: [Colors.white, Color(0xFFA1C95C)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ).createShader(bounds),
+                            child: Text(
+                              'NATDEMY',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: kIsWeb ? 48 : 36,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.5,
+                                fontStyle: FontStyle.italic,
+                                height: 1.0,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: kIsWeb ? 4 : 3),
+                          // Tagline
+                          Text(
+                            'Learn Any Time, Any Where',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: kIsWeb ? 18 : 14,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withOpacity(0.5),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: kIsWeb ? 8 : 8),
+                          // Welcome text in row
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Welcome',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: kIsWeb ? 16 : 14,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withOpacity(0.5),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  widget.student.name.isEmpty ? 'Student' : widget.student.name,
+                                  style: TextStyle(
+                                    color: const Color(0xFFA1C95C),
+                                    fontSize: kIsWeb ? 24 : 22,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.5,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black.withOpacity(0.5),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: kIsWeb ? 8 : 8),
+                          // CTA with icon
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.rocket_launch_rounded,
+                                color: const Color(0xFFA1C95C),
+                                size: kIsWeb ? 18 : 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'Your learning journey starts here',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: kIsWeb ? 16 : 13,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.5,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black.withOpacity(0.5),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
               ),
             ),
@@ -1129,11 +1340,12 @@ _isLoadingTestimonials = false;
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: _contactInfo.phone != null ? () async {
-                            final phone = _contactInfo.phone!.replaceAll(RegExp(r'[^0-9+]'), '');
-                            final uri = Uri(scheme: 'tel', path: phone);
+                          onPressed: () async {
+                            final whatsappNum = '9192076666615'; // +91 92076 66615
+                            final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
+                            final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
                             await _launchUrl(uri);
-                          } : null,
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white.withOpacity(0.2),
                             foregroundColor: Colors.white,
@@ -1147,13 +1359,13 @@ _isLoadingTestimonials = false;
                               side: const BorderSide(color: Color(0xFF582DB0), width: 1),
                             ),
                           ),
-                                icon: Icon(
-                                  Icons.phone_outlined,
+                                icon: FaIcon(
+                                  FontAwesomeIcons.whatsapp,
                                   size: kIsWeb ? 24 : 20,
                                   color: Colors.white,
                                 ),
-                          label: Text(
-                            _contactInfo.phone != null ? 'Call ${_contactInfo.phone}' : 'Phone not available',
+                                label: Text(
+                            'WhatsApp Support',
                                   style: TextStyle(
                                     fontSize: kIsWeb ? 18 : 16,
                                     fontWeight: FontWeight.w600,
@@ -1166,11 +1378,12 @@ _isLoadingTestimonials = false;
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: _contactInfo.whatsappNumber != null ? () async {
-                            final whatsappNum = _contactInfo.whatsappNumber!.replaceAll(RegExp(r'[^0-9+]'), '');
-                            final uri = Uri.parse('https://wa.me/$whatsappNum?text=Hello%20Natdemy%20support');
+                          onPressed: () async {
+                            final whatsappNum = '9192076666614'; // +91 92076 66614
+                            final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
+                            final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
                             await _launchUrl(uri);
-                          } : null,
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white.withOpacity(0.2),
                             foregroundColor: Colors.white,
@@ -1288,10 +1501,11 @@ _isLoadingTestimonials = false;
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
-                          onPressed: _contactInfo.whatsappGroupLink != null ? () async {
-                            final uri = Uri.parse(_contactInfo.whatsappGroupLink!);
+                          onPressed: () async {
+                            final link = _contactInfo.whatsappGroupLink ?? 'https://chat.whatsapp.com/LpNUsxNbGPq4eFgVgFGSL2?mode=wwt';
+                            final uri = Uri.parse(link);
                             await _launchUrl(uri);
-                          } : null,
+                          },
                           style: FilledButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: const Color(0xFF25D366),
@@ -1388,11 +1602,12 @@ _isLoadingTestimonials = false;
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
-                              onPressed: _contactInfo.phone != null ? () async {
-                                final phone = _contactInfo.phone!.replaceAll(RegExp(r'[^0-9+]'), '');
-                                final uri = Uri(scheme: 'tel', path: phone);
+                              onPressed: () async {
+                                final whatsappNum = '9192076666615'; // +91 92076 66615
+                                final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
+                                final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
                                 await _launchUrl(uri);
-                              } : null,
+                              },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white.withOpacity(0.2),
                                 foregroundColor: Colors.white,
@@ -1406,13 +1621,13 @@ _isLoadingTestimonials = false;
                                   side: const BorderSide(color: Color(0xFF582DB0), width: 1),
                                 ),
                               ),
-                              icon: Icon(
-                                Icons.phone_outlined,
+                              icon: FaIcon(
+                                FontAwesomeIcons.whatsapp,
                                 size: kIsWeb ? 24 : 20,
                                 color: Colors.white,
                               ),
                               label: Text(
-                                _contactInfo.phone != null ? 'Call ${_contactInfo.phone}' : 'Phone not available',
+                                'WhatsApp Support',
                                 style: TextStyle(
                                   fontSize: kIsWeb ? 18 : 16,
                                   fontWeight: FontWeight.w600,
@@ -1425,11 +1640,12 @@ _isLoadingTestimonials = false;
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
-                              onPressed: _contactInfo.whatsappNumber != null ? () async {
-                                final whatsappNum = _contactInfo.whatsappNumber!.replaceAll(RegExp(r'[^0-9+]'), '');
-                                final uri = Uri.parse('https://wa.me/$whatsappNum?text=Hello%20Natdemy%20support');
+                              onPressed: () async {
+                                final whatsappNum = '9192076666614'; // +91 92076 66614
+                                final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
+                                final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
                                 await _launchUrl(uri);
-                              } : null,
+                              },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white.withOpacity(0.2),
                                 foregroundColor: Colors.white,
@@ -1544,10 +1760,11 @@ _isLoadingTestimonials = false;
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton.icon(
-                              onPressed: _contactInfo.whatsappGroupLink != null ? () async {
-                                final uri = Uri.parse(_contactInfo.whatsappGroupLink!);
+                              onPressed: () async {
+                                final link = _contactInfo.whatsappGroupLink ?? 'https://chat.whatsapp.com/LpNUsxNbGPq4eFgVgFGSL2?mode=wwt';
+                                final uri = Uri.parse(link);
                                 await _launchUrl(uri);
-                              } : null,
+                              },
                               style: FilledButton.styleFrom(
                                 backgroundColor: Colors.white,
                                 foregroundColor: const Color(0xFF25D366),
@@ -1998,11 +2215,15 @@ class ProfileTab extends StatefulWidget {
 
 class _ProfileTabState extends State<ProfileTab> {
   late Student _student;
+  bool _isLoadingStreams = false;
+  List<JoinedCourse> _assignedStreams = [];
+  String? _streamError;
 
   @override
   void initState() {
     super.initState();
     _student = widget.student;
+    _loadAssignedStreams();
   }
 
   @override
@@ -2010,6 +2231,129 @@ class _ProfileTabState extends State<ProfileTab> {
     super.didUpdateWidget(oldWidget);
     if (!identical(_student, widget.student)) {
       _student = widget.student;
+      _loadAssignedStreams();
+    }
+  }
+
+  Future<void> _loadAssignedStreams() async {
+    setState(() {
+      _isLoadingStreams = true;
+      _streamError = null;
+    });
+
+    try {
+      // Ensure courses are loaded
+      await JoinedCourses.instance.initialize(_student.email, forceRefresh: false);
+      
+      // Get all joined courses (enrollments) for the student
+      final joinedCourses = JoinedCourses.instance.all;
+      
+      // Also check student's registered course/stream from student data
+      try {
+        final studentData = await StudentService.fetchStudentDataWithCourseStream(_student.email);
+        if (studentData != null) {
+          final courseId = studentData['course_id'];
+          final streamId = studentData['stream_id'];
+          
+          if (courseId != null && streamId != null) {
+            // Find course and stream details
+            final allCourses = await CourseService.fetchCourses();
+            final streams = CourseService.cachedStreams;
+            
+            Course? registeredCourse;
+            CourseStream? registeredStream;
+            
+            try {
+              final courseIdInt = courseId is int ? courseId : int.tryParse(courseId.toString());
+              final streamIdInt = streamId is int ? streamId : int.tryParse(streamId.toString());
+              
+              if (courseIdInt != null) {
+                registeredCourse = allCourses.firstWhere((c) => c.id == courseIdInt);
+              }
+              if (streamIdInt != null) {
+                registeredStream = streams.firstWhere((s) => s.id == streamIdInt);
+              }
+              
+              // Check if this course-stream combination is already in joinedCourses
+              final exists = joinedCourses.any((c) => 
+                c.courseId == registeredCourse?.id && c.streamId == registeredStream?.id);
+              
+              if (!exists && registeredCourse != null && registeredStream != null) {
+                // Check verified status (API uses 'verification' field)
+                final rawVerified = studentData['verification'] ?? studentData['verified'];
+                bool? studentVerified;
+                if (rawVerified != null) {
+                  if (rawVerified is bool) {
+                    studentVerified = rawVerified;
+                  } else if (rawVerified is String) {
+                    studentVerified = rawVerified.toLowerCase() == 'true';
+                  } else if (rawVerified is int) {
+                    studentVerified = rawVerified == 1;
+                  }
+                }
+                
+                // Add registered course/stream (locked or unlocked based on verified)
+                final isEnrolled = studentVerified == true;
+                final registeredJoinedCourse = JoinedCourse(
+                  courseId: registeredCourse.id,
+                  title: registeredCourse.title,
+                  color: registeredCourse.color,
+                  description: registeredCourse.description.isNotEmpty 
+                      ? registeredCourse.description 
+                      : 'Description not available.',
+                  rating: registeredCourse.rating,
+                  streamId: registeredStream.id,
+                  streamName: registeredStream.name,
+                  whatYoullLearn: registeredCourse.whatYoullLearn,
+                  thumbnailUrl: registeredCourse.thumbnailUrl,
+                  durationHours: registeredCourse.durationHours,
+                  duration: registeredCourse.duration,
+                  studentCount: registeredCourse.studentCount,
+                  price: registeredCourse.price,
+                  lessonsCount: registeredCourse.lessonsCount,
+                  chaptersCount: registeredCourse.chaptersCount,
+                  topics: registeredCourse.topics,
+                  isEnrolled: isEnrolled, // Locked if verified != true
+                );
+                joinedCourses.add(registeredJoinedCourse);
+              }
+            } catch (e) {
+              debugPrint('⚠️ Could not find registered course/stream: $e');
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error fetching student course/stream data: $e');
+      }
+      
+      // Filter to get unique course-stream combinations
+      final Map<String, JoinedCourse> uniqueStreams = {};
+      for (final course in joinedCourses) {
+        if (course.streamId != null && course.streamName != null) {
+          final key = '${course.courseId}_${course.streamId}';
+          if (!uniqueStreams.containsKey(key)) {
+            uniqueStreams[key] = course;
+          }
+        }
+      }
+      
+      debugPrint('📊 Assigned Streams Summary:');
+      debugPrint('   Total joined courses: ${joinedCourses.length}');
+      debugPrint('   Unique streams found: ${uniqueStreams.length}');
+      uniqueStreams.values.forEach((course) {
+        debugPrint('   - ${course.title} > ${course.streamName} (${course.isEnrolled ? "Active" : "Locked"})');
+      });
+      
+      setState(() {
+        _assignedStreams = uniqueStreams.values.toList();
+        _isLoadingStreams = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading assigned streams: $e');
+      setState(() {
+        _streamError = 'Failed to load streams';
+        _isLoadingStreams = false;
+      });
     }
   }
 
@@ -2146,6 +2490,211 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
             ),
 
+            const SizedBox(height: 16),
+
+            // Assigned Streams Card
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: const Color(0xFF582DB0).withOpacity(0.2),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF582DB0).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.stream,
+                          color: Color(0xFF582DB0),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Assigned Streams',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (_isLoadingStreams)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else if (_streamError != null)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            Text(
+                              _streamError!,
+                              style: TextStyle(color: Colors.red[600]),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: _loadAssignedStreams,
+                              icon: const Icon(Icons.refresh, size: 18),
+                              label: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else if (_assignedStreams.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.stream_outlined,
+                              size: 48,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No streams assigned',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Streams will appear here once assigned',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[500],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    ..._assignedStreams.map((course) => Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF582DB0).withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFF582DB0).withOpacity(0.1),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF582DB0).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.menu_book,
+                                  color: Color(0xFF582DB0),
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      course.title,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF1E293B),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      course.streamName ?? 'No stream',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey[700],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (course.isEnrolled)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'Active',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'Locked',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.orange,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        )),
+                ],
+              ),
+            ),
             const SizedBox(height: 16),
 
             // Profile Edit Section

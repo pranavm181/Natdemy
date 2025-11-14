@@ -8,8 +8,7 @@ import '../utils/course_utils.dart';
 import '../widgets/rating_stars.dart';
 import '../widgets/main_drawer.dart';
 import '../api/course_service.dart';
-import 'live_upcoming.dart';
-import 'materials_page.dart';
+import '../api/contact_service.dart';
 import 'subject_detail.dart';
 import 'home.dart';
 
@@ -24,11 +23,41 @@ class MyCoursesScreen extends StatefulWidget {
 class _MyCoursesScreenState extends State<MyCoursesScreen> {
   JoinedCourse? _selected;
   bool _isLoading = true;
+  bool _hasLoadedOnce = false;
+  DateTime? _lastLoadTime;
 
   @override
   void initState() {
     super.initState();
-    _loadCourses();
+    _loadCourses(forceRefresh: true);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh courses when screen becomes visible, but avoid reloading immediately after initState
+    // Only reload if it's been more than 2 seconds since last load (to check for verification updates)
+    final now = DateTime.now();
+    final shouldReload = !_hasLoadedOnce || 
+                        _lastLoadTime == null || 
+                        now.difference(_lastLoadTime!).inSeconds > 2;
+    
+    if (shouldReload) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _loadCourses(forceRefresh: true);
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(MyCoursesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Refresh if student email changed
+    if (oldWidget.student.email != widget.student.email) {
+      _loadCourses(forceRefresh: true);
+    }
   }
 
   Future<void> _loadCourses({bool forceRefresh = false}) async {
@@ -36,20 +65,40 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
       setState(() => _isLoading = true);
       // Small delay to ensure platform channels are ready
       await Future.delayed(const Duration(milliseconds: 100));
+      
+      // Always check verified status from API (forceRefresh ensures full reload)
       await JoinedCourses.instance.initialize(widget.student.email, forceRefresh: forceRefresh);
+      
       if (mounted) {
         final joined = JoinedCourses.instance.all;
         setState(() {
           _isLoading = false;
+          _hasLoadedOnce = true;
+          _lastLoadTime = DateTime.now();
           if (joined.isNotEmpty) {
-            _selected = joined.first;
+            // Update selected course to reflect latest status
+            final currentSelectedId = _selected?.courseId;
+            final currentSelectedStreamId = _selected?.streamId;
+            if (currentSelectedId != null && currentSelectedStreamId != null) {
+              final updatedCourse = joined.firstWhere(
+                (c) => c.courseId == currentSelectedId && c.streamId == currentSelectedStreamId,
+                orElse: () => joined.first,
+              );
+              _selected = updatedCourse;
+            } else {
+              _selected = joined.first;
+            }
           }
         });
       }
     } catch (e) {
       debugPrint('Error loading courses: $e');
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _hasLoadedOnce = true;
+          _lastLoadTime = DateTime.now();
+        });
       }
     }
   }
@@ -153,8 +202,6 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
               onChangeCourse: () => _showCourseSelectionDialog(context, joined),
             ),
             const SizedBox(height: 16),
-            _actionButtons(context),
-            const SizedBox(height: 20),
             _subjectSection(context),
             const SizedBox(height: 24),
             _contactSection(context),
@@ -180,65 +227,61 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
     ),
   );
 
-  Widget _actionButtons(BuildContext context) => Row(
-    children: [
-      Expanded(
-        child: OutlinedButton.icon(
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const LiveUpcomingPage()),
-            );
-          },
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: Color(0xFF582DB0), width: 2),
-            foregroundColor: const Color(0xFF582DB0),
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          icon: const Icon(Icons.live_tv_outlined, size: 20),
-          label: const Text(
-            'Live',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-        ),
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: OutlinedButton.icon(
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => MaterialsPage(
-                  courseTitle: _selected!.title,
-                  courseId: _selected!.courseId,
-                ),
-              ),
-            );
-          },
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: Color(0xFF582DB0), width: 2),
-            foregroundColor: const Color(0xFF582DB0),
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          icon: const Icon(Icons.folder_open_outlined, size: 20),
-          label: const Text(
-            'Material',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-        ),
-      ),
-    ],
-  );
-
   Widget _subjectSection(BuildContext context) {
     final selectedCourse = _selected;
     if (selectedCourse == null) {
       return const SizedBox.shrink();
+    }
+
+    // Show locked message if course is not enrolled
+    if (!selectedCourse.isEnrolled) {
+      return Card(
+        elevation: 8,
+        shadowColor: Colors.black.withOpacity(0.15),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Colors.orange, width: 2),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              const Icon(
+                Icons.lock_outline,
+                size: 64,
+                color: Colors.orange,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Course Locked',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: const Color(0xFF000000),
+                      fontSize: 22,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Your enrollment is pending approval.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF64748B),
+                      fontSize: 16,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'You will be able to access this course once your enrollment is confirmed.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFF94A3B8),
+                      fontSize: 14,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     final streamTitle = _resolveStreamTitle(selectedCourse);
@@ -275,6 +318,25 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   List<Widget> _buildChapterTiles(BuildContext context, List<CourseChapter> chapters) {
     return chapters.map((chapter) {
       final lessonCount = chapter.lessons.length;
+      // Count total videos across all lessons in this chapter
+      final videoCount = chapter.lessons.fold<int>(
+        0,
+        (sum, lesson) => sum + lesson.videos.length,
+      );
+      
+      // Build subtitle text showing lessons and videos
+      String? subtitleText;
+      if (lessonCount > 0 || videoCount > 0) {
+        final parts = <String>[];
+        if (lessonCount > 0) {
+          parts.add('$lessonCount lesson${lessonCount == 1 ? '' : 's'}');
+        }
+        if (videoCount > 0) {
+          parts.add('$videoCount video${videoCount == 1 ? '' : 's'}');
+        }
+        subtitleText = parts.join(' • ');
+      }
+      
       return Card(
         elevation: 8,
         shadowColor: Colors.black.withOpacity(0.15),
@@ -296,9 +358,9 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
               fontSize: 16,
             ),
           ),
-          subtitle: lessonCount > 0
+          subtitle: subtitleText != null
               ? Text(
-                  '$lessonCount lesson${lessonCount == 1 ? '' : 's'}',
+                  subtitleText,
                   style: const TextStyle(
                     color: Color(0xFF64748B),
                     fontSize: 13,
@@ -327,92 +389,114 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
     }).toList();
   }
 
-  Widget _contactSection(BuildContext context) => Card(
-    elevation: 8,
-    shadowColor: Colors.black.withOpacity(0.15),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-      side: const BorderSide(color: Color(0xFF582DB0), width: 2),
-    ),
-    child: Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+  Widget _contactSection(BuildContext context) => FutureBuilder<ContactInfo>(
+    future: ContactService.getContactInfo(),
+    builder: (context, snapshot) {
+      final contactInfo = snapshot.data ?? ContactInfo.getDefault();
+      final whatsappNum = contactInfo.whatsappNumber?.replaceAll(RegExp(r'[^0-9+]'), '') ?? '9192076666621';
+      // For tel: scheme, remove all non-digit characters including +
+      final phoneNumForCall = contactInfo.phone?.replaceAll(RegExp(r'[^0-9]'), '') ?? '9192076666621';
+      
+      return Card(
+        elevation: 8,
+        shadowColor: Colors.black.withOpacity(0.15),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFF582DB0), width: 2),
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'CONTACT',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                fontSize: 22,
-                letterSpacing: 0.5,
-              ),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            const SizedBox(height: 16),
-            Row(
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      final uri = Uri.parse(
-                        'https://wa.me/15551234567?text=Hello%2C%20I%20need%20help%20with%20${Uri.encodeComponent(_selected!.title)}',
-                      );
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.2),
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Color(0xFFA1C95C), width: 1),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 20, color: Colors.white),
-                    label: const Text(
-                      'WhatsApp',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
-                    ),
+                const Text(
+                  'CONTACT',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    fontSize: 22,
+                    letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      final uri = Uri(scheme: 'tel', path: '+15551234567');
-                      await launchUrl(uri);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.2),
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Color(0xFFA1C95C), width: 1),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
+                          final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Color(0xFFA1C95C), width: 1),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 20, color: Colors.white),
+                        label: const Text(
+                          'WhatsApp',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
                       ),
                     ),
-                    icon: const Icon(Icons.call, size: 20, color: Colors.white),
-                    label: const Text(
-                      'Call',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: contactInfo.phone != null ? () async {
+                          final uri = Uri(scheme: 'tel', path: phoneNumForCall);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          } else {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Unable to make a call. Please check your device settings.'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        } : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Color(0xFFA1C95C), width: 1),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(Icons.call, size: 20, color: Colors.white),
+                        label: Text(
+                          contactInfo.phone ?? 'Call',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
-      ),
-    ),
+      );
+    },
   );
 
   void _showCourseSelectionDialog(BuildContext context, List<JoinedCourse> courses) {

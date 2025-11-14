@@ -38,11 +38,13 @@ class StudentService {
       if (response.statusCode == 200) {
         final List<dynamic> studentsJson = json.decode(response.body);
         
-        // Find student by email
+        // Find student by email (case-insensitive)
+        final normalizedEmail = email.toLowerCase().trim();
         for (var studentJson in studentsJson) {
           final studentData = studentJson as Map<String, dynamic>;
-          if (studentData['email'] == email) {
-            debugPrint('✅ Found student: ${studentData['name']}');
+          final studentEmail = studentData['email']?.toString()?.toLowerCase()?.trim();
+          if (studentEmail == normalizedEmail) {
+            debugPrint('✅ Found student: ${studentData['name']} (ID: ${studentData['id']})');
             return _parseStudentFromJson(studentData);
           }
         }
@@ -55,6 +57,70 @@ class StudentService {
       }
     } catch (e, stackTrace) {
       debugPrint('❌ Error fetching student: $e');
+      debugPrint('   Stack trace: $stackTrace');
+      return null;
+    }
+  }
+
+  // Fetch student by ID from students API
+  static Future<Student?> fetchStudentById(int studentId) async {
+    try {
+      debugPrint('🔄 Fetching student data for ID: $studentId');
+      final response = await ApiClient.get('/api/students/', queryParams: {'format': 'json'}, includeAuth: false);
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> studentsJson = json.decode(response.body);
+        
+        // Find student by ID
+        for (var studentJson in studentsJson) {
+          final studentData = studentJson as Map<String, dynamic>;
+          final id = _asDouble(studentData['id'])?.toInt();
+          if (id == studentId) {
+            debugPrint('✅ Found student by ID: ${studentData['name']} (Email: ${studentData['email']})');
+            return _parseStudentFromJson(studentData);
+          }
+        }
+        
+        debugPrint('⚠️ Student not found with ID: $studentId');
+        return null;
+      } else {
+        debugPrint('❌ Failed to fetch students: ${response.statusCode}');
+        return null;
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error fetching student by ID: $e');
+      debugPrint('   Stack trace: $stackTrace');
+      return null;
+    }
+  }
+
+  // Fetch student data with course_id and stream_id
+  static Future<Map<String, dynamic>?> fetchStudentDataWithCourseStream(String email) async {
+    try {
+      debugPrint('🔄 Fetching student course/stream data for: $email');
+      final response = await ApiClient.get('/api/students/', queryParams: {'format': 'json'}, includeAuth: false);
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> studentsJson = json.decode(response.body);
+        
+        // Find student by email
+        for (var studentJson in studentsJson) {
+          final studentData = studentJson as Map<String, dynamic>;
+          if (studentData['email'] == email) {
+            debugPrint('✅ Found student data with course/stream');
+            // Return the full student data including course_id and stream_id
+            return studentData;
+          }
+        }
+        
+        debugPrint('⚠️ Student not found with email: $email');
+        return null;
+      } else {
+        debugPrint('❌ Failed to fetch student data: ${response.statusCode}');
+        return null;
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error fetching student course/stream data: $e');
       debugPrint('   Stack trace: $stackTrace');
       return null;
     }
@@ -147,7 +213,7 @@ class StudentService {
             final enrollments = homeDataMap['enrollments'];
             if (enrollments is List && enrollments.isNotEmpty) {
               debugPrint('✅ Found enrollments in home API');
-              return _parseEnrollmentsFromList(
+              return await _parseEnrollmentsFromList(
                 enrollments,
                 email,
                 studentId: targetStudentId,
@@ -184,7 +250,7 @@ class StudentService {
         return [];
       }
       
-      return _parseEnrollmentsFromList(
+      return await _parseEnrollmentsFromList(
         enrollments,
         email,
         studentId: targetStudentId,
@@ -197,55 +263,86 @@ class StudentService {
   }
   
   // Helper method to parse enrollments list
-  static List<JoinedCourse> _parseEnrollmentsFromList(
+  static Future<List<JoinedCourse>> _parseEnrollmentsFromList(
     List enrollments,
     String email, {
     int? studentId,
-  }) {
+  }) async {
     final List<JoinedCourse> joinedCourses = [];
+    final normalizedEmail = email.toLowerCase().trim();
+    
+    debugPrint('🔍 Parsing ${enrollments.length} enrollment(s) for email: $email (ID: $studentId)');
 
     for (final enrollment in enrollments) {
       if (enrollment is! Map<String, dynamic>) continue;
 
-      // For home API, enrollments don't have student filter - show all enrollments
-      // For enrollments API, filter by student email
+      // Extract student information from enrollment
       final studentData = enrollment['student'];
-      final studentEmail = (studentData is Map<String, dynamic>)
-          ? studentData['email']?.toString()
-          : enrollment['student_email']?.toString();
-
-      // If student_email is provided, filter by it; otherwise show all (home API case)
-      if (studentEmail != null && studentEmail.toLowerCase() != email.toLowerCase()) {
-        continue;
-      }
-
-      if (studentEmail == null && studentId != null) {
-        final rawStudentId = _asDouble(enrollment['student_id'])?.toInt();
-        final nestedStudentId = studentData is Map<String, dynamic>
-            ? _asDouble(studentData['id'])?.toInt()
-            : null;
-        final matchesId = (rawStudentId != null && rawStudentId == studentId) ||
-            (nestedStudentId != null && nestedStudentId == studentId);
-
-        if (!matchesId) {
-          continue;
+      String? studentEmail;
+      int? enrollmentStudentId;
+      
+      // Debug: Log raw enrollment structure
+      debugPrint('   Raw enrollment keys: ${enrollment.keys.toList()}');
+      if (studentData != null) {
+        debugPrint('   Student data type: ${studentData.runtimeType}');
+        if (studentData is Map<String, dynamic>) {
+          debugPrint('   Student data keys: ${studentData.keys.toList()}');
         }
       }
-
-      if (studentEmail != null &&
-          studentEmail.toLowerCase() == email.toLowerCase() &&
-          studentId != null) {
-        final rawStudentId = _asDouble(enrollment['student_id'])?.toInt();
-        final nestedStudentId = studentData is Map<String, dynamic>
-            ? _asDouble(studentData['id'])?.toInt()
-            : null;
-
-        if (rawStudentId != null && rawStudentId != studentId && nestedStudentId != studentId) {
-          continue;
+      
+      if (studentData is Map<String, dynamic>) {
+        studentEmail = studentData['email']?.toString()?.trim();
+        enrollmentStudentId = _asDouble(studentData['id'])?.toInt();
+        // Also check for nested student data
+        if (studentEmail == null) {
+          final nestedStudent = studentData['student'];
+          if (nestedStudent is Map<String, dynamic>) {
+            studentEmail = nestedStudent['email']?.toString()?.trim();
+            enrollmentStudentId ??= _asDouble(nestedStudent['id'])?.toInt();
+          }
+        }
+      } else if (studentData is int || studentData is String) {
+        // Student data might just be an ID reference
+        enrollmentStudentId = _asDouble(studentData)?.toInt();
+        debugPrint('   Student data is ID reference: $enrollmentStudentId');
+      }
+      
+      // Fallback to direct fields
+      studentEmail ??= enrollment['student_email']?.toString()?.trim();
+      enrollmentStudentId ??= _asDouble(enrollment['student_id'])?.toInt();
+      
+      // If we have student ID but no email, try to fetch student by ID to get email
+      if (studentEmail == null && enrollmentStudentId != null) {
+        try {
+          final student = await fetchStudentById(enrollmentStudentId);
+          if (student != null) {
+            studentEmail = student.email;
+            debugPrint('   ✅ Fetched student email from enrollment student ID $enrollmentStudentId: $studentEmail');
+          }
+        } catch (e) {
+          debugPrint('   ⚠️ Could not fetch student by ID $enrollmentStudentId: $e');
         }
       }
+      
+      // Debug: Log enrollment details
+      debugPrint('   Enrollment: studentEmail=$studentEmail, enrollmentStudentId=$enrollmentStudentId, targetEmail=$normalizedEmail, targetId=$studentId');
 
-      if (studentEmail == null && studentId == null) {
+      // Match by email first (most reliable)
+      bool matches = false;
+      if (studentEmail != null && studentEmail.toLowerCase().trim() == normalizedEmail) {
+        matches = true;
+        debugPrint('   ✅ Matched by email: $studentEmail');
+      }
+      
+      // Match by student ID if email didn't match
+      if (!matches && studentId != null && enrollmentStudentId != null && enrollmentStudentId == studentId) {
+        matches = true;
+        debugPrint('   ✅ Matched by student ID: $enrollmentStudentId');
+      }
+      
+      // If no match, skip this enrollment
+      if (!matches) {
+        debugPrint('   ⏭️ Skipping enrollment - no match');
         continue;
       }
 
@@ -290,6 +387,26 @@ class StudentService {
           ? 'Description not available.'
           : course.description;
 
+      // Check if enrollment is verified (verified field from backend)
+      // Also check is_enrolled for backward compatibility
+      final enrolledAt = _parseDate(enrollment['enrolled_at']);
+      final verified = enrollment['verified'] != null
+          ? (enrollment['verified'] is bool
+              ? enrollment['verified'] as bool
+              : enrollment['verified'].toString().toLowerCase() == 'true')
+          : null;
+      
+      final isEnrolledField = enrollment['is_enrolled'] != null
+          ? (enrollment['is_enrolled'] is bool
+              ? enrollment['is_enrolled'] as bool
+              : enrollment['is_enrolled'].toString().toLowerCase() == 'true')
+          : null;
+      
+      // Course is enrolled if verified is true, or is_enrolled is true, or enrolled_at exists
+      final isEnrolled = verified == true 
+          || isEnrolledField == true 
+          || (verified == null && isEnrolledField == null && enrolledAt != null);
+
       final joinedCourse = JoinedCourse(
         courseId: course.id,
         title: course.title,
@@ -309,9 +426,10 @@ class StudentService {
         topics: course.topics,
         progressPercentage:
             _asDouble(enrollment['progress_percentage']) ?? _asDouble(enrollment['progress']),
-        enrolledAt: _parseDate(enrollment['enrolled_at']),
+        enrolledAt: enrolledAt,
         lastAccessedAt: _parseDate(enrollment['last_accessed_at']),
         chapters: chapters,
+        isEnrolled: isEnrolled,
       );
 
       joinedCourses.add(joinedCourse);

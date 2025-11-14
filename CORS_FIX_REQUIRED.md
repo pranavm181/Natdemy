@@ -132,3 +132,5 @@ The Flutter app currently uses a fallback (`course_id: 1`) when course fetching 
 🔴 **CRITICAL** - Without CORS configuration, the Flutter web app cannot function in browsers.
 
 
+
+

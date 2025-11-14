@@ -184,27 +184,27 @@ class _HomeShellState extends State<HomeShell> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              _currentStudent.name.isEmpty ? 'Student' : _currentStudent.name,
-                              style: const TextStyle(
-                                color: Colors.white,
+                      Text(
+                        _currentStudent.name.isEmpty ? 'Student' : _currentStudent.name,
+                        style: const TextStyle(
+                          color: Colors.white,
                                 fontSize: 22,
-                                fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w700,
                                 height: 1.2,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _currentStudent.email,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.9),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _currentStudent.email,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
                                 fontSize: 16,
                                 height: 1.2,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
@@ -630,13 +630,10 @@ _isLoadingTestimonials = false;
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _courses = courses;
           if (courses.isEmpty) {
-            // API returned no valid courses (likely only placeholders)
-            _errorMessage = 'API connected but no courses available yet. Showing sample courses.';
-            _courses = courseCatalog; // Fallback to hardcoded courses
-            debugPrint('ℹ️ Using fallback courses: ${courseCatalog.length} courses');
+            _errorMessage = 'No courses available.';
           } else {
-            _courses = courses;
             _errorMessage = null;
             debugPrint('✅ Displaying ${courses.length} courses from API');
           }
@@ -647,11 +644,9 @@ _isLoadingTestimonials = false;
       debugPrint('   Stack trace: $stackTrace');
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to load courses from API. Showing sample courses.';
+          _errorMessage = 'Failed to load courses from API. Please try again.';
           _isLoading = false;
-          // Fallback to hardcoded courses if API fails
-          _courses = courseCatalog;
-          debugPrint('ℹ️ Using fallback courses due to error: ${courseCatalog.length} courses');
+          _courses = [];
         });
       }
     }
@@ -665,9 +660,20 @@ _isLoadingTestimonials = false;
     }
   }
 
+  // Helper function to clean WhatsApp number - keep +91 prefix, remove other non-digit characters
+  String _cleanWhatsAppNumber(String number) {
+    // Remove spaces and other characters, but keep digits
+    final cleaned = number.replaceAll(RegExp(r'[^0-9]'), '');
+    // If number doesn't start with 91, add it
+    if (!cleaned.startsWith('91')) {
+      return '91$cleaned';
+    }
+    return cleaned;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final allCourses = _courses.isEmpty ? courseCatalog : _courses;
+    final allCourses = _courses;
     final courses = allCourses.length > 4 ? allCourses.take(4).toList() : List<Course>.from(allCourses);
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -833,8 +839,8 @@ _isLoadingTestimonials = false;
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(kIsWeb ? 32 : 20),
-                child: Stack(
-                  children: [
+              child: Stack(
+                children: [
                     // Natdemy logo in background
                     Positioned.fill(
                       child: Opacity(
@@ -912,16 +918,16 @@ _isLoadingTestimonials = false;
                       ),
                     ),
                     // Main content
-                    Padding(
+                  Padding(
                       padding: EdgeInsets.symmetric(
                         horizontal: kIsWeb ? 48 : 28,
                         vertical: kIsWeb ? 20 : 12,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                         mainAxisSize: MainAxisSize.min,
-                        children: [
+                      children: [
                           // Badge
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -946,24 +952,24 @@ _isLoadingTestimonials = false;
                                 Container(
                                   padding: const EdgeInsets.all(3),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFA1C95C),
+                          color: const Color(0xFFA1C95C),
                                     shape: BoxShape.circle,
-                                  ),
+                          ),
                                   child: const Icon(
                                     Icons.school_rounded,
                                     color: Colors.white,
                                     size: 12,
                                   ),
-                                ),
+                        ),
                                 const SizedBox(width: 6),
                                 Flexible(
                                   child: Text(
                                     'Premium Learning Platform',
-                                    style: TextStyle(
+                          style: TextStyle(
                                       color: Colors.white,
                                       fontSize: kIsWeb ? 13 : 11,
                                       fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.5,
+                            letterSpacing: 0.5,
                                       shadows: [
                                         Shadow(
                                           color: Colors.black.withOpacity(0.3),
@@ -971,10 +977,10 @@ _isLoadingTestimonials = false;
                                           offset: const Offset(0, 1),
                                         ),
                                       ],
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                                 ),
                               ],
                             ),
@@ -1008,12 +1014,12 @@ _isLoadingTestimonials = false;
                           ),
                           SizedBox(height: kIsWeb ? 4 : 3),
                           // Tagline
-                          Text(
+                        Text(
                             'Learn Any Time, Any Where',
-                            style: TextStyle(
+                        style: TextStyle(
                               color: Colors.white,
                               fontSize: kIsWeb ? 18 : 14,
-                              fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w700,
                               letterSpacing: 0.8,
                               shadows: [
                                 Shadow(
@@ -1023,15 +1029,15 @@ _isLoadingTestimonials = false;
                                 ),
                               ],
                             ),
-                          ),
+                        ),
                           SizedBox(height: kIsWeb ? 8 : 8),
                           // Welcome text in row
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
+                      Text(
                                 'Welcome',
-                                style: TextStyle(
+                          style: TextStyle(
                                   color: Colors.white,
                                   fontSize: kIsWeb ? 16 : 14,
                                   fontWeight: FontWeight.w800,
@@ -1061,13 +1067,13 @@ _isLoadingTestimonials = false;
                                         offset: const Offset(0, 2),
                                       ),
                                     ],
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                                ),
+                        ),
+                      ],
+                    ),
                           SizedBox(height: kIsWeb ? 8 : 8),
                           // CTA with icon
                           Row(
@@ -1093,11 +1099,11 @@ _isLoadingTestimonials = false;
                                         offset: const Offset(0, 2),
                                       ),
                                     ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
                         ],
                       ),
                     ),
@@ -1341,7 +1347,45 @@ _isLoadingTestimonials = false;
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: () async {
-                            final whatsappNum = '9192076666615'; // +91 92076 66615
+                            final whatsappNum = _cleanWhatsAppNumber('+91 9207666614');
+                            final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
+                            final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
+                            await _launchUrl(uri);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: kIsWeb ? 20 : 16,
+                                    horizontal: kIsWeb ? 24 : 16,
+                                  ),
+                            shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                              side: const BorderSide(color: Color(0xFF582DB0), width: 1),
+                            ),
+                          ),
+                                icon: FaIcon(
+                                  FontAwesomeIcons.whatsapp,
+                                  size: kIsWeb ? 24 : 20,
+                                  color: Colors.white,
+                                ),
+                          label: Text(
+                            'WhatsApp Support',
+                                  style: TextStyle(
+                                    fontSize: kIsWeb ? 18 : 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            final whatsappNum = _cleanWhatsAppNumber('+91 9207666614');
                             final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
                             final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
                             await _launchUrl(uri);
@@ -1366,44 +1410,6 @@ _isLoadingTestimonials = false;
                                 ),
                                 label: Text(
                             'WhatsApp Support',
-                                  style: TextStyle(
-                                    fontSize: kIsWeb ? 18 : 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final whatsappNum = '9192076666614'; // +91 92076 66614
-                            final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
-                            final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
-                            await _launchUrl(uri);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white.withOpacity(0.2),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: kIsWeb ? 20 : 16,
-                                    horizontal: kIsWeb ? 24 : 16,
-                                  ),
-                            shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
-                              side: const BorderSide(color: Color(0xFF582DB0), width: 1),
-                            ),
-                          ),
-                                icon: FaIcon(
-                                  FontAwesomeIcons.whatsapp,
-                                  size: kIsWeb ? 24 : 20,
-                                  color: Colors.white,
-                                ),
-                                label: Text(
-                            'Chat on WhatsApp',
                                   style: TextStyle(
                                     fontSize: kIsWeb ? 18 : 16,
                                     fontWeight: FontWeight.w600,
@@ -1603,7 +1609,7 @@ _isLoadingTestimonials = false;
                             width: double.infinity,
                             child: ElevatedButton.icon(
                               onPressed: () async {
-                                final whatsappNum = '9192076666615'; // +91 92076 66615
+                                final whatsappNum = _cleanWhatsAppNumber('+91 9207666614');
                                 final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
                                 final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
                                 await _launchUrl(uri);
@@ -1641,7 +1647,7 @@ _isLoadingTestimonials = false;
                             width: double.infinity,
                             child: ElevatedButton.icon(
                               onPressed: () async {
-                                final whatsappNum = '9192076666614'; // +91 92076 66614
+                                final whatsappNum = _cleanWhatsAppNumber('+91 9207666614');
                                 final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
                                 final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
                                 await _launchUrl(uri);
@@ -1665,7 +1671,7 @@ _isLoadingTestimonials = false;
                                 color: Colors.white,
                               ),
                               label: Text(
-                                'Chat on WhatsApp',
+                                'WhatsApp Support',
                                 style: TextStyle(
                                   fontSize: kIsWeb ? 18 : 16,
                                   fontWeight: FontWeight.w600,

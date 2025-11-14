@@ -195,7 +195,7 @@ class SubjectDetailPage extends StatelessWidget {
               ),
               icon: const Icon(Icons.help_outline, size: 20),
               label: const Text(
-                'Question Bank',
+                'MCQ',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
               ),
             ),

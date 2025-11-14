@@ -51,7 +51,7 @@ class QuestionBankPage extends StatelessWidget {
           color: Colors.black,
         ),
         title: const Text(
-          'QUESTION BANK',
+          'MCQ',
           style: TextStyle(
             color: Color(0xFF582DB0),
             fontWeight: FontWeight.w900,

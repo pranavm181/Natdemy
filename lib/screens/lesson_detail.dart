@@ -26,7 +26,6 @@ class LessonDetailPage extends StatefulWidget {
 }
 
 class _LessonDetailPageState extends State<LessonDetailPage> {
-  late List<LessonVideo> fallbackVideos;
   late List<CourseVideo> apiVideos;
   late bool useApiVideos;
   int selectedVideoIndex = 0;
@@ -41,7 +40,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       apiVideos = lesson.videos;
     } else {
       useApiVideos = false;
-      fallbackVideos = getVideosForLesson(widget.lessonName);
+      apiVideos = [];
     }
   }
 
@@ -106,7 +105,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!useApiVideos && fallbackVideos.isEmpty) {
+    if (!useApiVideos || apiVideos.isEmpty) {
       return Scaffold(
         appBar: AppBar(
           backgroundColor: Colors.white,
@@ -130,19 +129,11 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       );
     }
 
-    final CourseVideo? currentCourseVideo =
-        useApiVideos ? apiVideos[selectedVideoIndex] : null;
-    final LessonVideo? currentFallbackVideo =
-        useApiVideos ? null : fallbackVideos[selectedVideoIndex];
-
-    final videoId = useApiVideos
-        ? (currentCourseVideo?.vimeoId ?? currentCourseVideo?.videoUrl ?? '')
-        : currentFallbackVideo?.vimeoId ?? '';
+    final CourseVideo? currentCourseVideo = apiVideos[selectedVideoIndex];
+    final videoId = currentCourseVideo?.vimeoId ?? currentCourseVideo?.videoUrl ?? '';
 
     final lessonMaterials = widget.lesson?.materials ?? const [];
-    // Fallback to hardcoded material if no API materials
-    final fallbackMaterialUrl = getMaterialForLesson(widget.lessonName);
-    final hasMaterials = lessonMaterials.isNotEmpty || fallbackMaterialUrl != null;
+    final hasMaterials = lessonMaterials.isNotEmpty;
     
     // Debug: Log materials count
     if (lessonMaterials.isNotEmpty) {
@@ -277,7 +268,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                           child: Text(
                             useApiVideos
                                 ? (currentCourseVideo?.name ?? 'Lesson Video')
-                                : (currentFallbackVideo?.name ?? 'Lesson Video'),
+                                : 'Lesson Video',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -352,13 +343,11 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                         ],
                       ),
                     );
-                  } else if (fallbackMaterialUrl != null) {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => PdfViewerScreen(
-                          pdfUrl: fallbackMaterialUrl!,
-                          pdfTitle: 'Lesson Materials',
-                        ),
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('No material available'),
+                        backgroundColor: Colors.red,
                       ),
                     );
                   }
@@ -487,34 +476,6 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                     );
                   }),
                   ],
-                ),
-              )
-            else if (fallbackMaterialUrl != null)
-              // Show single fallback material button
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: FilledButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => PdfViewerScreen(
-                          pdfUrl: fallbackMaterialUrl!,
-                          pdfTitle: 'Lesson Materials',
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.picture_as_pdf, size: 20),
-                  label: const Text(
-                    'View Materials',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF582DB0),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
                 ),
               ),
             const SizedBox(height: 8),
@@ -689,7 +650,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                   const Icon(Icons.quiz, color: Color(0xFF4ECDC4), size: 24),
                   const SizedBox(width: 8),
                   const Text(
-                    'QUESTION BANK',
+                    'MCQ',
                     style: TextStyle(
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF1E293B),
@@ -803,7 +764,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       if (apiVideos.isEmpty) return const ['Video not available'];
       return apiVideos.map((v) => v.name).toList();
     }
-    return fallbackVideos.map((v) => v.name).toList();
+    return const ['Video not available'];
   }
 }
 

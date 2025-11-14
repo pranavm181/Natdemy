@@ -323,8 +323,10 @@ class CourseDetailPage extends StatelessWidget {
                           _buildStatItem(
                             Icons.access_time,
                             course.durationHours != null
-                                ? '${course.durationHours}h'
-                                : '0h',
+                                ? '${(course.durationHours! / 160).round()} months'
+                                : course.duration != null
+                                    ? '${(course.duration! / 160).round()} months'
+                                    : '0 months',
                             'Duration',
                           ),
                         ],
@@ -353,8 +355,8 @@ class CourseDetailPage extends StatelessWidget {
                 future: ContactService.getContactInfo(),
                 builder: (context, snapshot) {
                   final contactInfo = snapshot.data ?? ContactInfo.getDefault();
-                  final whatsappNum = contactInfo.whatsappNumber?.replaceAll(RegExp(r'[^0-9+]'), '') ?? '15551234567';
-                  final phoneNum = contactInfo.phone?.replaceAll(RegExp(r'[^0-9+]'), '') ?? '15551234567';
+                  // Use specific WhatsApp number: +91 92076 66621
+                  final whatsappNum = '919207666621';
 
                   return SizedBox(
                     width: double.infinity,
@@ -500,63 +502,34 @@ class CourseDetailPage extends StatelessWidget {
                                           ),
                                         ),
                                         const SizedBox(height: 28),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: ElevatedButton.icon(
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: const Color(0xFF25D366),
-                                                  foregroundColor: Colors.white,
-                                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(16),
-                                                  ),
-                                                  elevation: 4,
-                                                ),
-                                                icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 20),
-                                                label: const Text(
-                                                  'WhatsApp',
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.w800,
-                                                    fontSize: 16,
-                                                  ),
-                                                ),
-                                                onPressed: () async {
-                                                  final uri = Uri.parse(
-                                                    'https://wa.me/$whatsappNum?text=I%20have%20a%20question%20about%20${Uri.encodeComponent(course.title)}',
-                                                  );
-                                                  Navigator.of(sheetContext).pop();
-                                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                                },
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: ElevatedButton.icon(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF25D366),
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(vertical: 16),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(16),
+                                              ),
+                                              elevation: 4,
+                                            ),
+                                            icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 20),
+                                            label: const Text(
+                                              'WhatsApp',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 16,
                                               ),
                                             ),
-                                            const SizedBox(width: 14),
-                                            Expanded(
-                                              child: OutlinedButton.icon(
-                                                style: OutlinedButton.styleFrom(
-                                                  side: const BorderSide(color: Color(0xFF582DB0), width: 2),
-                                                  foregroundColor: const Color(0xFF582DB0),
-                                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(16),
-                                                  ),
-                                                ),
-                                                icon: const Icon(Icons.phone_in_talk_rounded),
-                                                label: const Text(
-                                                  'Call Now',
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.w800,
-                                                    fontSize: 16,
-                                                  ),
-                                                ),
-                                                onPressed: () async {
-                                                  final uri = Uri(scheme: 'tel', path: phoneNum);
-                                                  Navigator.of(sheetContext).pop();
-                                                  await launchUrl(uri);
-                                                },
-                                              ),
-                                            ),
-                                          ],
+                                            onPressed: () async {
+                                              final uri = Uri.parse(
+                                                'https://wa.me/$whatsappNum?text=I%20have%20a%20question%20about%20${Uri.encodeComponent(course.title)}',
+                                              );
+                                              Navigator.of(sheetContext).pop();
+                                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                            },
+                                          ),
                                         ),
                                         const SizedBox(height: 24),
                                         Container(

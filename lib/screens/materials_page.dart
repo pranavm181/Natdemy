@@ -137,21 +137,12 @@ class _MaterialsPageState extends State<MaterialsPage> {
             }
           }
           
-          if (allMaterials.isNotEmpty) {
-            _materials = allMaterials;
-            _isLoading = false;
-            debugPrint('✅ Displaying ${_materials.length} material(s) total (${chapterMaterials.length} from chapter, ${apiMaterials.length} from API)');
+          _materials = allMaterials;
+          _isLoading = false;
+          if (allMaterials.isEmpty) {
+            _errorMessage = 'No materials available.';
           } else {
-            // Fallback to hardcoded materials
-            debugPrint('⚠️ No materials found, using fallback');
-            final fallbackMaterials = getMaterialsForCourse(widget.courseTitle);
-            _materials = fallbackMaterials.map((m) => CourseMaterial(
-              name: m.name,
-              url: m.url,
-              sizeLabel: m.sizeLabel,
-            )).toList();
-            _isLoading = false;
-            _errorMessage = 'Using offline materials';
+            debugPrint('✅ Displaying ${_materials.length} material(s) total (${chapterMaterials.length} from chapter, ${apiMaterials.length} from API)');
           }
         });
       }
@@ -160,7 +151,7 @@ class _MaterialsPageState extends State<MaterialsPage> {
       debugPrint('   Stack trace: $stackTrace');
       if (mounted) {
         setState(() {
-          // Combine chapter materials with fallback materials
+          // Combine chapter materials only
           final allMaterials = <CourseMaterial>[];
           
           // Add chapter materials first
@@ -179,21 +170,9 @@ class _MaterialsPageState extends State<MaterialsPage> {
             }
           }
           
-          // Add fallback materials (avoid duplicates)
-          final fallbackMaterials = getMaterialsForCourse(widget.courseTitle);
-          for (final fallbackMaterial in fallbackMaterials) {
-            if (!allMaterials.any((m) => m.url == fallbackMaterial.url)) {
-              allMaterials.add(CourseMaterial(
-                name: fallbackMaterial.name,
-                url: fallbackMaterial.url,
-                sizeLabel: fallbackMaterial.sizeLabel,
-              ));
-            }
-          }
-          
           _materials = allMaterials;
           _isLoading = false;
-          _errorMessage = allMaterials.isEmpty ? 'No materials available' : 'Using offline materials';
+          _errorMessage = allMaterials.isEmpty ? 'No materials available' : null;
         });
       }
     }

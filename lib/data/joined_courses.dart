@@ -397,22 +397,22 @@ class JoinedCourse {
       lessonsCount: json['lessons_count'] as int?,
       chaptersCount: json['chapters_count'] as int?,
       topics: json['topics'],
-        progressPercentage: _asDouble(json['progress_percentage']),
-        enrolledAt: _parseDate(json['enrolled_at']),
-        lastAccessedAt: _parseDate(json['last_accessed_at']),
-        chapters: (json['chapters'] is List)
-            ? (json['chapters'] as List)
-                .whereType<Map<String, dynamic>>()
-                .map(CourseChapter.fromJson)
-                .toList()
-            : const [],
+      progressPercentage: _asDouble(json['progress_percentage']),
+      enrolledAt: _parseDate(json['enrolled_at']),
+      lastAccessedAt: _parseDate(json['last_accessed_at']),
+      chapters: (json['chapters'] is List)
+          ? (json['chapters'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map(CourseChapter.fromJson)
+              .toList()
+          : const [],
         isEnrolled: json['is_enrolled'] != null
             ? (json['is_enrolled'] is bool
                 ? json['is_enrolled'] as bool
                 : json['is_enrolled'].toString().toLowerCase() == 'true')
             : true, // Default to enrolled if not specified
-      );
-    }
+    );
+  }
 }
 
 class JoinedCourses {

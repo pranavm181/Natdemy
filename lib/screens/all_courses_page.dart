@@ -43,8 +43,7 @@ class _AllCoursesPageState extends State<AllCoursesPage> {
       setState(() {
         _errorMessage = 'Failed to load courses. Please try again.';
         _isLoading = false;
-        // Fallback to hardcoded courses if API fails
-        _courses = courseCatalog;
+        _courses = [];
       });
     }
   }
@@ -272,7 +271,7 @@ class _AllCoursesPageState extends State<AllCoursesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final baseCourses = _courses.isEmpty ? courseCatalog : _courses;
+    final baseCourses = _courses;
     final filteredCourses = _applyCourseFilter(baseCourses);
     
     return Scaffold(

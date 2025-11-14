@@ -114,7 +114,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                 }
                 return const SizedBox.shrink();
               },
-            ),
+              ),
           ],
         ),
       ),
@@ -162,8 +162,8 @@ class _AppBanner extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(kIsWeb ? 32 : 20),
-        child: Stack(
-          children: [
+      child: Stack(
+        children: [
             // Natdemy logo in background
             Positioned.fill(
               child: Opacity(
@@ -245,10 +245,10 @@ class _AppBanner extends StatelessWidget {
               padding: EdgeInsets.symmetric(
                 horizontal: kIsWeb ? 48 : (isSmallScreen ? 20 : 28),
                 vertical: kIsWeb ? 20 : 12,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Badge
@@ -271,7 +271,7 @@ class _AppBanner extends StatelessWidget {
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: [
+              children: [
                         Container(
                           padding: const EdgeInsets.all(3),
                           decoration: BoxDecoration(
@@ -288,7 +288,7 @@ class _AppBanner extends StatelessWidget {
                         Flexible(
                           child: Text(
                             'Premium Learning Platform',
-                            style: TextStyle(
+                  style: TextStyle(
                               color: Colors.white,
                               fontSize: isSmallScreen ? 10 : (kIsWeb ? 13 : 11),
                               fontWeight: FontWeight.w800,
@@ -300,10 +300,10 @@ class _AppBanner extends StatelessWidget {
                                   offset: const Offset(0, 1),
                                 ),
                               ],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                         ),
                       ],
                     ),
@@ -318,7 +318,7 @@ class _AppBanner extends StatelessWidget {
                     ).createShader(bounds),
                     child: Text(
                       'NATDEMY',
-                      style: TextStyle(
+                  style: TextStyle(
                         color: Colors.white,
                         fontSize: kIsWeb ? 48 : (isSmallScreen ? 28 : 36),
                         fontWeight: FontWeight.w900,
@@ -334,15 +334,15 @@ class _AppBanner extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ),
+                ),
                   SizedBox(height: kIsWeb ? 4 : 3),
                   // Tagline
-                  Text(
+                Text(
                     'Learn Any Time, Any Where',
-                    style: TextStyle(
+                  style: TextStyle(
                       color: Colors.white,
                       fontSize: kIsWeb ? 18 : (isSmallScreen ? 12 : 14),
-                      fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w700,
                       letterSpacing: 0.8,
                       shadows: [
                         Shadow(
@@ -390,10 +390,10 @@ class _AppBanner extends StatelessWidget {
                                 offset: const Offset(0, 2),
                               ),
                             ],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                       ),
                     ],
                   ),
@@ -409,8 +409,8 @@ class _AppBanner extends StatelessWidget {
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          'Your learning journey starts here',
-                          style: TextStyle(
+                  'Your learning journey starts here',
+                  style: TextStyle(
                             color: Colors.white,
                             fontSize: kIsWeb ? 16 : (isSmallScreen ? 11 : 13),
                             fontWeight: FontWeight.w800,
@@ -420,10 +420,10 @@ class _AppBanner extends StatelessWidget {
                                 color: Colors.black.withOpacity(0.5),
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                        ),
+                ),
+              ],
+            ),
+          ),
                       ),
                     ],
                   ),

@@ -23,10 +23,13 @@ class ContactInfo {
   final Map<String, String>? socialMedia;
 
   factory ContactInfo.fromJson(Map<String, dynamic> json) {
+    final phone = json['phone'] as String?;
+    final whatsappNumber = json['whatsapp_number'] as String? ?? json['whatsapp'] as String?;
+    
     return ContactInfo(
       email: json['email'] as String?,
-      phone: json['phone'] as String?,
-      whatsappNumber: json['whatsapp_number'] as String? ?? json['whatsapp'] as String?,
+      phone: _removeCountryCode(phone),
+      whatsappNumber: _removeCountryCode(whatsappNumber),
       whatsappGroupLink: json['whatsapp_group_link'] as String? ?? json['whatsapp_link'] as String?,
       website: json['website'] as String?,
       address: json['address'] as String?,
@@ -36,12 +39,33 @@ class ContactInfo {
     );
   }
 
+  // Helper function to ensure phone numbers have +91 prefix
+  static String? _removeCountryCode(String? phoneNumber) {
+    if (phoneNumber == null) return null;
+    // Remove spaces and clean the number
+    final cleaned = phoneNumber.replaceAll(RegExp(r'\s'), '').trim();
+    // If it doesn't start with +91, add it
+    if (!cleaned.startsWith('+91') && !cleaned.startsWith('91')) {
+      return '+91 $cleaned';
+    }
+    // If it starts with 91 but not +91, add +
+    if (cleaned.startsWith('91') && !cleaned.startsWith('+91')) {
+      return '+91 ${cleaned.substring(2)}';
+    }
+    // If it already has +91, just format with space
+    if (cleaned.startsWith('+91')) {
+      final rest = cleaned.substring(3).trim();
+      return '+91 $rest';
+    }
+    return cleaned;
+  }
+
   // Get default values if API data is missing
   static ContactInfo getDefault() {
     return const ContactInfo(
       email: 'support@natdemy.com',
       phone: '+91 92076 66621',
-      whatsappNumber: '9192076666621',
+      whatsappNumber: '+91 92076666621',
       whatsappGroupLink: 'https://chat.whatsapp.com/LpNUsxNbGPq4eFgVgFGSL2?mode=wwt',
       website: 'www.natdemy.com',
     );
@@ -150,10 +174,13 @@ class ContactService {
                 String? phoneNumber;
                 String? whatsappNum;
                 if (whatsappNumber != null) {
-                  // Remove spaces and format
-                  final cleaned = whatsappNumber.replaceAll(RegExp(r'[^0-9+]'), '');
-                  whatsappNum = cleaned;
-                  phoneNumber = whatsappNumber; // Keep formatted version for display
+                  // Keep +91 prefix, remove spaces, keep digits and +
+                  final cleaned = whatsappNumber
+                      .replaceAll(RegExp(r'\s'), '')
+                      .replaceAll(RegExp(r'[^0-9+]'), '');
+                  // Ensure it starts with 91 (for WhatsApp URL, no + needed)
+                  whatsappNum = cleaned.startsWith('+91') ? cleaned.substring(3) : (cleaned.startsWith('91') ? cleaned : '91$cleaned');
+                  phoneNumber = ContactInfo._removeCountryCode(whatsappNumber); // Keep formatted version for display
                 }
                 
                 // Create ContactInfo from whatsapp data

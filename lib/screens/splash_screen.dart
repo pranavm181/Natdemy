@@ -5,6 +5,7 @@ import '../data/student.dart';
 import '../data/joined_courses.dart';
 import '../data/auth_helper.dart';
 import '../api/student_service.dart';
+import '../api/course_service.dart';
 import 'home.dart';
 import 'loginscreen.dart';
 import 'onboarding_screen.dart';
@@ -78,11 +79,14 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkLoginStatus() async {
-    // Wait for animation to complete (minimum 2 seconds for professional feel)
-    await Future.delayed(const Duration(milliseconds: 2000));
-
-    // Small delay to ensure platform channels are ready
-    await Future.delayed(const Duration(milliseconds: 100));
+    // Initialize cache in parallel with animation
+    final cacheInit = CourseService.initializeCache();
+    
+    // Wait for animation to complete (reduced from 2000ms to 1200ms for faster loading)
+    await Future.delayed(const Duration(milliseconds: 1200));
+    
+    // Wait for cache initialization to complete
+    await cacheInit;
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -93,35 +97,41 @@ class _SplashScreenState extends State<SplashScreen>
       if (!mounted) return;
 
       if (isLoggedIn && savedEmail != null && savedName != null) {
-        // User is logged in, try to fetch latest data from API
-        Student? apiStudent;
-        try {
-          apiStudent = await StudentService.fetchStudentByEmail(savedEmail);
-          // If API data is available, update saved data
-          if (apiStudent != null) {
-            await AuthHelper.saveLoginData(apiStudent);
-          }
-        } catch (e) {
-          debugPrint('Error fetching student data from API: $e');
-        }
-        
-        // Use API data if available, otherwise use saved data
-        final student = apiStudent ?? Student(
+        // Create student from saved data immediately (don't wait for API)
+        final student = Student(
           name: savedName,
           email: savedEmail,
           phone: prefs.getString('user_phone') ?? '',
           profileImagePath: prefs.getString('user_profile_image'),
         );
         
-        // Load their courses
-        await JoinedCourses.instance.initialize(savedEmail);
-        
+        // Navigate immediately, load data in parallel in background
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => HomeShell(student: student),
           ),
         );
+        
+        // Load API data and courses in background (non-blocking)
+        Future.wait([
+          // Fetch student data from API
+          StudentService.fetchStudentByEmail(savedEmail).then((apiStudent) {
+            if (apiStudent != null) {
+              AuthHelper.saveLoginData(apiStudent).catchError((e) {
+                debugPrint('Error saving login data: $e');
+              });
+            }
+          }).catchError((e) {
+            debugPrint('Error fetching student data from API: $e');
+          }),
+          // Load courses in background (will use cache if available)
+          JoinedCourses.instance.initialize(savedEmail).catchError((e) {
+            debugPrint('Error loading courses: $e');
+          }),
+        ]).catchError((e) {
+          debugPrint('Error in background loading: $e');
+        });
       } else {
         // User not logged in, show onboarding
         if (!mounted) return;
@@ -183,7 +193,7 @@ class _SplashScreenState extends State<SplashScreen>
                       ],
                     ),
                     child: Image.asset(
-                      'assets/images/natdemy_logo2.png',
+                      'assets/images/LIGHT LOGO-NAT.png',
                       height: 140,
                       fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) {

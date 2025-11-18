@@ -1,0 +1,552 @@
+================================================================================
+STUDENT COURSE ASSIGNMENT LOGIC - FOR ADMIN APP
+================================================================================
+
+This document contains the complete logic for assigning courses to students,
+which can be used in a separate admin application.
+
+================================================================================
+1. API ENDPOINTS
+================================================================================
+
+1.1 GET /api/students/ - Fetch All Students
+   Query Params: {'format': 'json'}
+   Response: List of student objects
+   
+   Student Object Structure:
+   {
+     "id": 12,
+     "name": "Student Name",
+     "email": "student@example.com",
+     "phone": "+1234567890",
+     "student_id": "STD1762865095514341",
+     "photo": "/media/photos/photo.jpg",
+     "course_id": 1,           // Assigned course ID
+     "stream_id": 2,           // Assigned stream ID
+     "verification": true,      // or "verified": true - Student verification status
+     "verified": true           // Alternative field name
+   }
+
+1.2 GET /api/students/ - Fetch Student by Email
+   Query Params: {'format': 'json'}
+   Logic: Filter students list by email (case-insensitive)
+
+1.3 GET /api/students/ - Fetch Student by ID
+   Query Params: {'format': 'json'}
+   Logic: Filter students list by student ID
+
+1.4 GET /api/students/ - Fetch Student by Student Code
+   Query Params: {'format': 'json'}
+   Logic: Filter students list by student_id field (e.g., "STD1762865095514341")
+
+1.5 GET /api/home/ - Fetch Enrollments
+   Query Params: {'format': 'json'}
+   Response: {
+     "data": {
+       "enrollments": [
+         {
+           "id": 123,
+           "student": {
+             "id": 12,
+             "email": "student@example.com"
+           },
+           "student_id": 12,
+           "student_email": "student@example.com",
+           "course": { /* Course object */ },
+           "stream": { /* Stream object */ },
+           "chapters": [ /* Chapter array */ ],
+           "verified": true,
+           "is_enrolled": true,
+           "enrolled_at": "2025-01-20T10:00:00Z",
+           "progress_percentage": 45.5
+         }
+       ]
+     }
+   }
+
+1.6 GET /api/enrollments/ - Alternative Enrollments Endpoint
+   Query Params: {'format': 'json'}
+   Response: Same structure as /api/home/ enrollments
+
+1.7 POST /api/admin/enrollments - Create Enrollment (Admin)
+   Headers: {
+     'Content-Type': 'application/json',
+     'Accept': 'application/json',
+     'Authorization': 'Bearer {token}'  // Optional
+   }
+   Request Body: {
+     "student_id": 12,
+     "course_id": 1,
+     "stream_id": 2,
+     "verified": true
+   }
+   Response: Enrollment object with status 200-299
+
+1.8 POST /api/enrollments/ - Create Enrollment (Fallback)
+   Headers: Same as above
+   Request Body: Same as above
+   Response: Enrollment object with status 200-299
+
+================================================================================
+2. STUDENT COURSE ASSIGNMENT DATA STRUCTURE
+================================================================================
+
+2.1 Student Assignment Fields:
+   - course_id (int, nullable): The course assigned to the student
+   - stream_id (int, nullable): The stream within the course
+   - verification (bool) or verified (bool): Whether student is verified
+     - true: Student is verified, course should be unlocked
+     - false/null: Student is not verified, course should be locked
+
+2.2 Enrollment Object:
+   {
+     "id": 123,
+     "student_id": 12,
+     "course_id": 1,
+     "stream_id": 2,
+     "verified": true,
+     "is_enrolled": true,
+     "enrolled_at": "2025-01-20T10:00:00Z",
+     "progress_percentage": 45.5,
+     "last_accessed_at": "2025-01-21T15:30:00Z",
+     "course": { /* Full course object */ },
+     "stream": { /* Stream object */ },
+     "chapters": [ /* Chapter array with lessons and videos */ ]
+   }
+
+================================================================================
+3. COURSE ASSIGNMENT LOGIC FLOW
+================================================================================
+
+3.1 ASSIGNING A COURSE TO A STUDENT:
+
+   Step 1: Verify Student Exists
+   - Fetch student by email, ID, or student code
+   - Ensure student record exists before assignment
+
+   Step 2: Update Student Record
+   - Set course_id and stream_id on student record
+   - Set verification/verified field to true (if student is verified)
+   - Save student record
+
+   Step 3: Create Enrollment (if verified)
+   - Check if enrollment already exists for this student + course + stream
+   - If not exists and student is verified:
+     * POST to /api/admin/enrollments (preferred)
+     * Or POST to /api/enrollments/ (fallback)
+     * Include: student_id, course_id, stream_id, verified: true
+
+   Step 4: Verify Assignment
+   - Fetch student's enrolled courses
+   - Verify enrollment appears in list
+   - Check that isEnrolled/verified status is correct
+
+3.2 CHECKING IF ENROLLMENT EXISTS:
+
+   Logic:
+   1. Fetch all enrollments from /api/home/ or /api/enrollments/
+   2. Match enrollment by:
+      - student_id == enrollment.student_id OR
+      - student.email == enrollment.student.email OR
+      - student.email == enrollment.student_email
+   3. Check if course_id and stream_id match
+   4. Return true if match found, false otherwise
+
+3.3 STUDENT MATCHING LOGIC:
+
+   When matching enrollments to students, use this priority:
+   
+   1. Match by Email (Most Reliable):
+      - Normalize both emails: toLowerCase().trim()
+      - Compare normalized emails
+      - If match, enrollment belongs to student
+   
+   2. Match by Student ID (Fallback):
+      - Compare student.id with enrollment.student_id
+      - Or compare student.id with enrollment.student.id
+      - If match, enrollment belongs to student
+   
+   3. Match by Student Code:
+      - Compare student.student_id with enrollment data
+      - Use as last resort
+
+================================================================================
+4. VERIFICATION STATUS LOGIC
+================================================================================
+
+4.1 Verification Field Names:
+   - Primary: "verification" (bool)
+   - Alternative: "verified" (bool)
+   - Check both fields for compatibility
+
+4.2 Verification Status Parsing:
+   
+   If verification/verified field is:
+   - bool true → Student is verified
+   - bool false → Student is not verified
+   - String "true" → Student is verified
+   - String "false" → Student is not verified
+   - int 1 → Student is verified
+   - int 0 → Student is not verified
+   - null/undefined → Student is not verified (default)
+
+4.3 Course Lock/Unlock Logic:
+   
+   Course is UNLOCKED (isEnrolled = true) if:
+   - verification == true OR
+   - verified == true OR
+   - is_enrolled == true OR
+   - enrolled_at exists (and verification fields are null)
+   
+   Course is LOCKED (isEnrolled = false) if:
+   - verification == false OR
+   - verified == false OR
+   - is_enrolled == false OR
+   - All verification fields are null/false
+
+================================================================================
+5. CODE EXAMPLES (Pseudo-code)
+================================================================================
+
+5.1 ASSIGN COURSE TO STUDENT:
+
+   function assignCourseToStudent(studentEmail, courseId, streamId, isVerified) {
+     // Step 1: Fetch student
+     student = fetchStudentByEmail(studentEmail);
+     if (!student) {
+       throw Error("Student not found");
+     }
+     
+     // Step 2: Update student record
+     student.course_id = courseId;
+     student.stream_id = streamId;
+     student.verification = isVerified;
+     updateStudent(student);
+     
+     // Step 3: Create enrollment if verified
+     if (isVerified) {
+       enrollmentExists = checkEnrollmentExists(student.id, courseId, streamId);
+       if (!enrollmentExists) {
+         createEnrollment({
+           student_id: student.id,
+           course_id: courseId,
+           stream_id: streamId,
+           verified: true
+         });
+       }
+     }
+   }
+
+5.2 CHECK ENROLLMENT EXISTS:
+
+   function checkEnrollmentExists(studentId, courseId, streamId) {
+     enrollments = fetchEnrollments();
+     
+     for (enrollment in enrollments) {
+       // Match by student ID
+       enrollmentStudentId = enrollment.student_id || enrollment.student?.id;
+       if (enrollmentStudentId == studentId) {
+         // Check course and stream match
+         if (enrollment.course.id == courseId && 
+             enrollment.stream.id == streamId) {
+           return true;
+         }
+       }
+     }
+     
+     return false;
+   }
+
+5.3 CREATE ENROLLMENT:
+
+   function createEnrollment(enrollmentData) {
+     // Try admin endpoint first
+     try {
+       response = POST('/api/admin/enrollments', {
+         headers: {
+           'Content-Type': 'application/json',
+           'Accept': 'application/json',
+           'Authorization': 'Bearer {token}'  // If available
+         },
+         body: JSON.stringify({
+           student_id: enrollmentData.student_id,
+           course_id: enrollmentData.course_id,
+           stream_id: enrollmentData.stream_id,
+           verified: enrollmentData.verified || true
+         })
+       });
+       
+       if (response.status >= 200 && response.status < 300) {
+         return response.data;
+       }
+     } catch (error) {
+       // Fallback to regular endpoint
+     }
+     
+     // Fallback to regular endpoint
+     response = POST('/api/enrollments/', {
+       headers: {
+         'Content-Type': 'application/json',
+         'Accept': 'application/json',
+         'Authorization': 'Bearer {token}'  // If available
+       },
+       body: JSON.stringify({
+         student_id: enrollmentData.student_id,
+         course_id: enrollmentData.course_id,
+         stream_id: enrollmentData.stream_id,
+         verified: enrollmentData.verified || true
+       })
+     });
+     
+     if (response.status >= 200 && response.status < 300) {
+       return response.data;
+     } else {
+       throw Error('Failed to create enrollment: ' + response.status);
+     }
+   }
+
+5.4 FETCH STUDENT ENROLLED COURSES:
+
+   function fetchStudentEnrolledCourses(studentEmail) {
+     // Normalize email
+     normalizedEmail = studentEmail.toLowerCase().trim();
+     
+     // Fetch student to get ID
+     student = fetchStudentByEmail(studentEmail);
+     studentId = student?.id;
+     
+     // Try home API first
+     try {
+       response = GET('/api/home/', {format: 'json'});
+       data = response.data;
+       enrollments = data.enrollments || [];
+       
+       if (enrollments.length > 0) {
+         return filterEnrollmentsByStudent(enrollments, normalizedEmail, studentId);
+       }
+     } catch (error) {
+       // Fallback to enrollments endpoint
+     }
+     
+     // Fallback to enrollments endpoint
+     response = GET('/api/enrollments/', {format: 'json'});
+     data = response.data.data;
+     enrollments = data.enrollments || [];
+     
+     return filterEnrollmentsByStudent(enrollments, normalizedEmail, studentId);
+   }
+
+5.5 FILTER ENROLLMENTS BY STUDENT:
+
+   function filterEnrollmentsByStudent(enrollments, targetEmail, targetId) {
+     matchedEnrollments = [];
+     
+     for (enrollment in enrollments) {
+       // Extract student info from enrollment
+       studentData = enrollment.student;
+       enrollmentEmail = null;
+       enrollmentStudentId = null;
+       
+       if (studentData is Object) {
+         enrollmentEmail = studentData.email?.toLowerCase().trim();
+         enrollmentStudentId = studentData.id;
+       }
+       
+       // Fallback to direct fields
+       enrollmentEmail = enrollmentEmail || enrollment.student_email?.toLowerCase().trim();
+       enrollmentStudentId = enrollmentStudentId || enrollment.student_id;
+       
+       // Match by email (most reliable)
+       matches = false;
+       if (enrollmentEmail == targetEmail) {
+         matches = true;
+       }
+       
+       // Match by student ID if email didn't match
+       if (!matches && targetId && enrollmentStudentId == targetId) {
+         matches = true;
+       }
+       
+       if (matches) {
+         // Parse course and verify it's not a placeholder
+         course = enrollment.course;
+         if (course && course.title.toLowerCase().trim() != 'none' && course.title) {
+           matchedEnrollments.push(enrollment);
+         }
+       }
+     }
+     
+     return matchedEnrollments;
+   }
+
+5.6 UPDATE STUDENT VERIFICATION STATUS:
+
+   function updateStudentVerification(studentEmail, isVerified) {
+     // Fetch student
+     student = fetchStudentByEmail(studentEmail);
+     if (!student) {
+       throw Error("Student not found");
+     }
+     
+     // Update verification status
+     student.verification = isVerified;
+     updateStudent(student);
+     
+     // If verified and has course/stream, create enrollment
+     if (isVerified && student.course_id && student.stream_id) {
+       enrollmentExists = checkEnrollmentExists(
+         student.id, 
+         student.course_id, 
+         student.stream_id
+       );
+       
+       if (!enrollmentExists) {
+         createEnrollment({
+           student_id: student.id,
+           course_id: student.course_id,
+           stream_id: student.stream_id,
+           verified: true
+         });
+       } else {
+         // Update existing enrollment verified status
+         updateEnrollment(enrollmentId, {verified: true});
+       }
+     }
+   }
+
+================================================================================
+6. ADMIN APP IMPLEMENTATION CHECKLIST
+================================================================================
+
+When implementing course assignment in admin app:
+
+□ 1. Student Selection
+   - Provide UI to search/select student by email, ID, or name
+   - Display current course/stream assignment if any
+
+□ 2. Course/Stream Selection
+   - Provide dropdown/selector for courses
+   - Provide dropdown/selector for streams (filtered by selected course)
+   - Validate that stream belongs to selected course
+
+□ 3. Verification Status
+   - Provide checkbox/toggle for verification status
+   - Show current verification status
+   - Explain that verified students get unlocked courses
+
+□ 4. Assignment Action
+   - Button: "Assign Course" or "Update Assignment"
+   - On click:
+     a. Update student record with course_id, stream_id, verification
+     b. Check if enrollment exists
+     c. Create enrollment if verified and enrollment doesn't exist
+     d. Show success/error message
+
+□ 5. Enrollment Management
+   - Display list of student's current enrollments
+   - Show enrollment status (verified, locked, unlocked)
+   - Allow removing enrollments (if needed)
+   - Show enrollment date and progress
+
+□ 6. Bulk Operations (Optional)
+   - Assign same course/stream to multiple students
+   - Bulk verify/unverify students
+   - Export enrollment data
+
+□ 7. Validation
+   - Ensure course_id and stream_id are valid
+   - Ensure stream belongs to course
+   - Prevent duplicate enrollments
+   - Validate student exists before assignment
+
+□ 8. Error Handling
+   - Handle API errors gracefully
+   - Show user-friendly error messages
+   - Retry failed requests
+   - Log errors for debugging
+
+================================================================================
+7. IMPORTANT NOTES
+================================================================================
+
+1. Student Matching:
+   - Always normalize emails (lowercase, trim) before comparison
+   - Email matching is most reliable
+   - Student ID matching is fallback
+
+2. Verification Status:
+   - Check both "verification" and "verified" fields
+   - Handle different data types (bool, string, int)
+   - Default to false if null/undefined
+
+3. Enrollment Creation:
+   - Only create enrollment if student is verified
+   - Check for existing enrollment before creating
+   - Use admin endpoint first, fallback to regular endpoint
+
+4. Course Lock/Unlock:
+   - Verified = true → Course unlocked (isEnrolled = true)
+   - Verified = false/null → Course locked (isEnrolled = false)
+   - This controls whether student can access course content
+
+5. API Endpoints Priority:
+   - For enrollments: Try /api/home/ first, then /api/enrollments/
+   - For creating: Try /api/admin/enrollments first, then /api/enrollments/
+
+6. Data Consistency:
+   - Keep student.course_id/stream_id in sync with enrollments
+   - Update enrollments when student assignment changes
+   - Remove enrollments when student assignment is cleared
+
+7. Error Handling:
+   - Always handle cases where student/course/stream not found
+   - Handle network errors and API failures
+   - Provide meaningful error messages to admin users
+
+================================================================================
+8. EXAMPLE ADMIN WORKFLOW
+================================================================================
+
+Scenario: Admin wants to assign "Computer Science" course, "Python" stream 
+to student "john@example.com" and verify them.
+
+Step 1: Admin searches for student "john@example.com"
+   → System fetches student record
+   → Shows current assignment (if any): "Mathematics - Algebra"
+
+Step 2: Admin selects:
+   - Course: "Computer Science" (course_id: 3)
+   - Stream: "Python" (stream_id: 5)
+   - Verification: ✓ (checked)
+
+Step 3: Admin clicks "Assign Course"
+   → System updates student record:
+     * course_id = 3
+     * stream_id = 5
+     * verification = true
+   
+   → System checks if enrollment exists:
+     * Fetches enrollments for student
+     * Checks if enrollment with course_id=3, stream_id=5 exists
+     * Result: No enrollment found
+   
+   → System creates enrollment:
+     * POST /api/admin/enrollments
+     * Body: {student_id: 12, course_id: 3, stream_id: 5, verified: true}
+     * Response: Success (200)
+   
+   → System shows success message:
+     "Course assigned successfully. Student can now access the course."
+
+Step 4: Admin verifies assignment
+   → System fetches student's enrolled courses
+   → Shows "Computer Science - Python" in enrolled courses list
+   → Shows status: "Active" (unlocked)
+
+================================================================================
+END OF DOCUMENT
+================================================================================
+
+
+
+

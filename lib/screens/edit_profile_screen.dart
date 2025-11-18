@@ -8,6 +8,8 @@ import '../data/student.dart';
 import '../data/auth_helper.dart';
 import '../utils/image_utils.dart';
 import '../utils/file_operations.dart';
+import '../widgets/theme_loading_indicator.dart';
+import '../utils/animations.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key, required this.student, required this.onProfileUpdated});
@@ -20,6 +22,7 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
+  late TextEditingController _studentIdController;
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _currentPasswordController;
@@ -40,6 +43,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _studentIdController = TextEditingController(text: widget.student.studentId ?? '');
     _nameController = TextEditingController(text: widget.student.name);
     _emailController = TextEditingController(text: widget.student.email);
     _currentPasswordController = TextEditingController();
@@ -51,6 +55,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   void dispose() {
+    _studentIdController.dispose();
     _nameController.dispose();
     _emailController.dispose();
     _currentPasswordController.dispose();
@@ -71,6 +76,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     // Save to SharedPreferences
     final updatedStudent = Student(
+      id: widget.student.id,
+      studentId: widget.student.studentId,
       name: name,
       email: email,
       phone: phone,
@@ -249,6 +256,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ),
               const SizedBox(height: 32),
+              // Student ID (read-only)
+              TextFormField(
+                controller: _studentIdController,
+                readOnly: true,
+                enabled: false,
+                decoration: InputDecoration(
+                  labelText: 'Student ID',
+                  prefixIcon: const Icon(Icons.badge_outlined),
+                  hintText: 'Student ID',
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                ),
+                style: const TextStyle(
+                  color: Color(0xFF475569),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 20),
               // Name Field
               TextFormField(
                 controller: _nameController,
@@ -312,13 +337,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 child: FilledButton.icon(
                   onPressed: _isLoading ? null : _saveProfile,
                   icon: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
+                      ? const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: ThemePulsingDotsIndicator(size: 8.0, spacing: 6.0, color: Colors.white),
                         )
                       : const Icon(Icons.save, size: 20),
                   label: Text(
@@ -460,13 +481,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         child: OutlinedButton.icon(
                           onPressed: _isChangingPassword ? null : _changePassword,
                           icon: _isChangingPassword
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Color(0xFF582DB0),
-                                  ),
+                              ? const Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: ThemePulsingDotsIndicator(size: 8.0, spacing: 6.0, color: Color(0xFF582DB0)),
                                 )
                               : const Icon(Icons.lock_reset, size: 20),
                           label: Text(

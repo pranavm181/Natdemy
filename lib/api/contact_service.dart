@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
 
 class ContactInfo {
@@ -75,17 +76,76 @@ class ContactInfo {
 class ContactService {
   static ContactInfo? _cachedContactInfo;
   static DateTime? _cacheTime;
-  static const Duration _cacheDuration = Duration(minutes: 30);
+  static const Duration _cacheDuration = Duration(hours: 24); // Cache for 24 hours
+  static const String _cacheKey = 'cached_contact_info';
+  static const String _cacheTimeKey = 'contact_cache_time';
 
-  // Fetch contact information from API
+  // Load contact info from persistent cache
+  static Future<ContactInfo?> _loadFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final contactJson = prefs.getString(_cacheKey);
+      final cacheTimeStr = prefs.getString(_cacheTimeKey);
+      
+      if (contactJson != null && cacheTimeStr != null) {
+        final cacheTime = DateTime.parse(cacheTimeStr);
+        final cacheAge = DateTime.now().difference(cacheTime);
+        
+        if (cacheAge < _cacheDuration) {
+          final Map<String, dynamic> decoded = json.decode(contactJson);
+          final contactInfo = ContactInfo.fromJson(decoded);
+          
+          _cachedContactInfo = contactInfo;
+          _cacheTime = cacheTime;
+          
+          debugPrint('📦 Loaded contact info from persistent cache (age: ${cacheAge.inMinutes}m)');
+          return contactInfo;
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error loading contact info from cache: $e');
+    }
+    return null;
+  }
+
+  // Save contact info to persistent cache
+  static Future<void> _saveToCache(ContactInfo contactInfo) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final contactJson = json.encode({
+        'email': contactInfo.email,
+        'phone': contactInfo.phone,
+        'whatsapp_number': contactInfo.whatsappNumber,
+        'whatsapp_group_link': contactInfo.whatsappGroupLink,
+        'website': contactInfo.website,
+        'address': contactInfo.address,
+        'social_media': contactInfo.socialMedia,
+      });
+      await prefs.setString(_cacheKey, contactJson);
+      await prefs.setString(_cacheTimeKey, DateTime.now().toIso8601String());
+      debugPrint('💾 Saved contact info to persistent cache');
+    } catch (e) {
+      debugPrint('⚠️ Error saving contact info to cache: $e');
+    }
+  }
+
+  // Fetch contact information from API (with persistent caching)
   static Future<ContactInfo> fetchContactInfo({bool forceRefresh = false}) async {
-    // Return cached data if still valid
-    if (!forceRefresh &&
-        _cachedContactInfo != null &&
-        _cacheTime != null &&
-        DateTime.now().difference(_cacheTime!) < _cacheDuration) {
-      debugPrint('📞 Using cached contact info');
-      return _cachedContactInfo!;
+    // Try to load from cache first (if not forcing refresh)
+    if (!forceRefresh) {
+      // Check in-memory cache first
+      if (_cachedContactInfo != null &&
+          _cacheTime != null &&
+          DateTime.now().difference(_cacheTime!) < _cacheDuration) {
+        debugPrint('📞 Using in-memory cached contact info');
+        return _cachedContactInfo!;
+      }
+      
+      // Try persistent cache
+      final cachedContact = await _loadFromCache();
+      if (cachedContact != null) {
+        return cachedContact;
+      }
     }
 
     try {
@@ -123,6 +183,7 @@ class ContactService {
               if (contactInfo != null && (contactInfo.phone != null || contactInfo.whatsappNumber != null)) {
                 _cachedContactInfo = contactInfo;
                 _cacheTime = DateTime.now();
+                await _saveToCache(contactInfo);
                 debugPrint('✅ Contact info loaded from contactus API: email=${contactInfo.email}, phone=${contactInfo.phone}');
                 return contactInfo;
               }
@@ -157,6 +218,7 @@ class ContactService {
                 // Cache and return
                 _cachedContactInfo = contactInfo;
                 _cacheTime = DateTime.now();
+                await _saveToCache(contactInfo);
                 debugPrint('✅ Contact info loaded from home API: email=${contactInfo.email}, phone=${contactInfo.phone}');
                 return contactInfo;
               }
@@ -195,6 +257,7 @@ class ContactService {
                 // Cache and return
                 _cachedContactInfo = contactInfo;
                 _cacheTime = DateTime.now();
+                await _saveToCache(contactInfo);
                 debugPrint('✅ Contact info loaded from home API whatsapp: phone=${contactInfo.phone}, whatsapp=${contactInfo.whatsappNumber}');
                 return contactInfo;
               }
@@ -246,6 +309,7 @@ class ContactService {
           // Cache the result
           _cachedContactInfo = contactInfo;
           _cacheTime = DateTime.now();
+          await _saveToCache(contactInfo);
 
           debugPrint('✅ Contact info loaded: email=${contactInfo.email}, phone=${contactInfo.phone}');
           return contactInfo;

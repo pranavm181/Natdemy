@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -14,11 +16,16 @@ import '../utils/image_utils.dart';
 import '../utils/responsive.dart';
 import '../widgets/rating_stars.dart';
 import '../widgets/main_drawer.dart';
+import '../widgets/theme_loading_indicator.dart';
+import '../utils/animations.dart';
 import '../api/course_service.dart';
 import '../api/contact_service.dart';
 import '../api/student_service.dart';
 import '../api/testimonial_service.dart';
+import '../api/banner_service.dart';
 import '../data/testimonial.dart';
+import '../data/banner.dart';
+import '../widgets/banner_carousel.dart';
 import 'all_courses_page.dart';
 import 'course_detail.dart';
 import 'edit_profile_screen.dart';
@@ -49,29 +56,36 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   Future<void> _initializeCourses() async {
-    // Small delay to ensure platform channels are ready
-    await Future.delayed(const Duration(milliseconds: 100));
-    // Always ensure courses are loaded for the current user
-    await JoinedCourses.instance.initialize(_currentStudent.email);
+    // Remove delay - not needed, platform channels are ready by initState
+    // Parallelize API calls for better performance
+    await Future.wait([
+      // Load courses in background
+      JoinedCourses.instance.initialize(_currentStudent.email),
+      // Refresh student data in parallel
+      _refreshStudentDataInBackground(),
+    ]);
     
-    // Try to refresh student data from API
+    if (mounted) {
+      setState(() {
+        _isInitialized = true;
+      });
+    }
+  }
+  
+  Future<void> _refreshStudentDataInBackground() async {
     try {
       final apiStudent = await StudentService.fetchStudentByEmail(_currentStudent.email);
       if (apiStudent != null && mounted) {
         setState(() {
           _currentStudent = apiStudent;
         });
-        // Save updated data
-        await AuthHelper.saveLoginData(apiStudent);
+        // Save updated data (non-blocking)
+        AuthHelper.saveLoginData(apiStudent).catchError((e) {
+          debugPrint('Error saving login data: $e');
+        });
       }
     } catch (e) {
       debugPrint('Error refreshing student data: $e');
-    }
-    
-    if (mounted) {
-      setState(() {
-        _isInitialized = true;
-      });
     }
   }
 
@@ -569,13 +583,72 @@ class _HomeTabState extends State<HomeTab> {
   bool _isLoadingContact = true;
   List<Testimonial> _testimonials = [];
   bool _isLoadingTestimonials = true;
+  List<AppBanner> _banners = [];
+  bool _isLoadingBanners = true;
+  late final PageController _testimonialPageController;
+  int _currentTestimonialIndex = 0;
+
+  double _calculateTestimonialTextWidth(double cardWidth) {
+    final double padding = kIsWeb ? 16 : 12;
+    final double quotePadding = kIsWeb ? 8 : 6;
+    final double quoteIconSize = kIsWeb ? 24 : 20;
+    final double quoteContainerWidth = (quotePadding * 2) + quoteIconSize;
+    final double sideSpacing = (kIsWeb ? 12 : 10) * 2;
+    final double contentWidth =
+        cardWidth - (padding * 2) - (quoteContainerWidth * 2) - sideSpacing;
+    return contentWidth.clamp(48.0, cardWidth);
+  }
+
+  double _calculateTestimonialCardHeight(
+    double cardWidth,
+    Testimonial testimonial,
+    BuildContext context,
+  ) {
+    final double textWidth = _calculateTestimonialTextWidth(cardWidth);
+    final textStyle = TextStyle(
+      fontSize: kIsWeb ? 14.5 : 12.5,
+      color: Colors.grey[800],
+      height: 1.45,
+      fontWeight: FontWeight.w400,
+      letterSpacing: 0.2,
+    );
+    final textPainter = TextPainter(
+      text: TextSpan(text: testimonial.content.trim(), style: textStyle),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: textWidth);
+
+    final double quotePadding = kIsWeb ? 8 : 6;
+    final double quoteIconSize = kIsWeb ? 24 : 20;
+    final double quoteHeight = (quotePadding * 2) + quoteIconSize;
+
+    final double verticalPadding = (kIsWeb ? 14 : 10) * 2;
+    final double headerHeight = math.max(kIsWeb ? 36 : 32, (kIsWeb ? 18 : 16) * 2);
+    const double spacingAfterHeader = 16;
+    final double textBlockHeight = math.max(textPainter.height, quoteHeight);
+    final double spacingBelowText = kIsWeb ? 22 : 18;
+
+    final double totalHeight = verticalPadding +
+        headerHeight +
+        spacingAfterHeader +
+        textBlockHeight +
+        spacingBelowText +
+        (kIsWeb ? 36 : 28);
+
+    final double minHeight = kIsWeb ? 260.0 : 230.0;
+    final double maxHeight = MediaQuery.of(context).size.height * (kIsWeb ? 0.85 : 0.9);
+
+    return totalHeight.clamp(minHeight, maxHeight);
+  }
 
   @override
   void initState() {
     super.initState();
+    _testimonialPageController = PageController();
+    // Load all data in parallel for better performance
     _loadCourses();
     _loadContactInfo();
     _loadTestimonials();
+    _loadBanners();
   }
 
   Future<void> _loadContactInfo() async {
@@ -599,34 +672,70 @@ class _HomeTabState extends State<HomeTab> {
 
   Future<void> _loadTestimonials() async {
     try {
-      debugPrint('🔄 Loading testimonials...');
-      final testimonials = await TestimonialService.fetchTestimonials();
-      debugPrint('📊 Loaded ${testimonials.length} testimonials');
+      // Load from cache first (fast), then refresh from API in background
+      final testimonials = await TestimonialService.fetchTestimonials(forceRefresh: false);
+      
       if (mounted) {
         setState(() {
           _testimonials = testimonials;
           _isLoadingTestimonials = false;
         });
       }
+      
+      // Refresh from API in background (non-blocking)
+      TestimonialService.fetchTestimonials(forceRefresh: true).then((updatedTestimonials) {
+        if (mounted) {
+          setState(() {
+            _testimonials = updatedTestimonials;
+          });
+        }
+      }).catchError((e) {
+        debugPrint('⚠️ Background testimonials refresh failed: $e');
+      });
     } catch (e, stackTrace) {
       debugPrint('❌ Error loading testimonials: $e');
       debugPrint('   Stack trace: $stackTrace');
       if (mounted) {
         setState(() {
-_isLoadingTestimonials = false;
+          _isLoadingTestimonials = false;
         });
       }
     }
   }
 
-  Future<void> _loadCourses() async {
+  Future<void> _loadBanners({bool forceNetwork = false}) async {
+    try {
+      if (!forceNetwork && _banners.isNotEmpty) {
+        debugPrint('📦 Using cached banners (count: ${_banners.length})');
+      }
+      final banners = await BannerService.fetchBanners();
+      if (mounted) {
+        setState(() {
+          _banners = banners;
+          _isLoadingBanners = false;
+        });
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error loading banners: $e');
+      debugPrint('   Stack trace: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _isLoadingBanners = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadCourses({bool forceNetwork = false}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final courses = await CourseService.fetchCourses();
+      // Load courses: hit API directly when explicitly refreshed, else load cached first
+      final courses = await CourseService.fetchCourses(forceRefresh: forceNetwork);
+      
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -635,8 +744,21 @@ _isLoadingTestimonials = false;
             _errorMessage = 'No courses available.';
           } else {
             _errorMessage = null;
-            debugPrint('✅ Displaying ${courses.length} courses from API');
+            debugPrint('✅ Displaying ${courses.length} courses');
           }
+        });
+      }
+      
+      if (!forceNetwork) {
+        // Refresh from API in background (non-blocking)
+        CourseService.fetchCourses(forceRefresh: true).then((updatedCourses) {
+          if (mounted && updatedCourses.isNotEmpty) {
+            setState(() {
+              _courses = updatedCourses;
+            });
+          }
+        }).catchError((e) {
+          debugPrint('⚠️ Background refresh failed: $e');
         });
       }
     } catch (e, stackTrace) {
@@ -644,12 +766,18 @@ _isLoadingTestimonials = false;
       debugPrint('   Stack trace: $stackTrace');
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to load courses from API. Please try again.';
+          _errorMessage = 'Failed to load courses. Please try again.';
           _isLoading = false;
           _courses = [];
         });
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _testimonialPageController.dispose();
+    super.dispose();
   }
 
   Future<void> _launchUrl(Uri url) async {
@@ -669,6 +797,296 @@ _isLoadingTestimonials = false;
       return '91$cleaned';
     }
     return cleaned;
+  }
+
+  Future<void> _showContactDialog(BuildContext context) async {
+    const whatsappNum1 = '919207666615';
+    const whatsappNum2 = '919207666614';
+    
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: const Color(0xFF582DB0),
+                  width: 2,
+                ),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFFF5F0FF),
+                    Color(0xFFFFFFFF),
+                  ],
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x33582DB0),
+                    blurRadius: 24,
+                    offset: Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 48,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFBFA5ED),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFF4D23AA),
+                                Color(0xFF6435C8),
+                              ],
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x40582DB0),
+                                blurRadius: 20,
+                                offset: Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.headset_mic,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Need help?',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF582DB0),
+                                ),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'Our team is ready on WhatsApp to answer any questions.',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  height: 1.5,
+                                  color: Color(0xFF4C3B82),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Color(0xFF582DB0)),
+                          tooltip: 'Close',
+                          onPressed: () => Navigator.of(sheetContext).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 28),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF25D366),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 4,
+                            ),
+                            icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 18),
+                            label: const Text(
+                              'WhatsApp 1',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                              ),
+                            ),
+                            onPressed: () async {
+                              final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
+                              final uri = Uri.parse('https://wa.me/$whatsappNum1?text=$message');
+                              Navigator.of(sheetContext).pop();
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF25D366),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 4,
+                            ),
+                            icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 18),
+                            label: const Text(
+                              'WhatsApp 2',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                              ),
+                            ),
+                            onPressed: () async {
+                              final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
+                              final uri = Uri.parse('https://wa.me/$whatsappNum2?text=$message');
+                              Navigator.of(sheetContext).pop();
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFFE0D2FF),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEEE4FF),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.info_outline,
+                              color: Color(0xFF582DB0),
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Text(
+                                  'Service Hours',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF452D8A),
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Mon - Sat · 9:00 AM to 6:00 PM',
+                                  style: TextStyle(
+                                    color: Color(0xFF5B4A9B),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBannerPlaceholder(BuildContext context) {
+    final aspectRatio = kIsWeb ? 16 / 3 : 16 / 4;
+    final borderRadius = BorderRadius.circular(kIsWeb ? 36 : 24);
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: borderRadius,
+        border: Border.all(
+          color: Colors.black.withOpacity(0.9),
+          width: kIsWeb ? 3.5 : 3,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 42,
+            spreadRadius: 4,
+            offset: const Offset(0, 20),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: AspectRatio(
+          aspectRatio: aspectRatio,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: Opacity(
+                  opacity: 0.12,
+                  child: Image.asset(
+                    'assets/images/natdemy_logo2.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                  ),
+                ),
+              ),
+              const Center(
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -803,371 +1221,83 @@ _isLoadingTestimonials = false;
 
         // Banner Carousel Section
         SliverToBoxAdapter(
-          child: Responsive.constrainWidth(
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                kIsWeb ? Responsive.getHorizontalPadding(context) : 16,
-                kIsWeb ? 40 : 16,
-                kIsWeb ? Responsive.getHorizontalPadding(context) : 16,
-                kIsWeb ? 32 : 16,
-              ),
-            child: Container(
-              constraints: BoxConstraints(
-                minHeight: kIsWeb ? 200 : 160,
-              ),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFF582DB0),
-                    const Color(0xFF7C3AED),
-                    const Color(0xFF8B5CF6),
-                    const Color(0xFF9333EA),
-                  ],
-                  stops: const [0.0, 0.3, 0.7, 1.0],
+          child: AppAnimations.fadeScaleIn(
+            delay: 100,
+            child: Responsive.constrainWidth(
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  kIsWeb ? Responsive.getHorizontalPadding(context) : 16,
+                  kIsWeb ? 40 : 16,
+                  kIsWeb ? Responsive.getHorizontalPadding(context) : 16,
+                  kIsWeb ? 32 : 16,
                 ),
-                borderRadius: BorderRadius.circular(kIsWeb ? 32 : 20),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF582DB0).withOpacity(0.4),
-                    blurRadius: kIsWeb ? 40 : 20,
-                    spreadRadius: kIsWeb ? 3 : 2,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(kIsWeb ? 32 : 20),
-              child: Stack(
-                children: [
-                    // Natdemy logo in background
-                    Positioned.fill(
-                      child: Opacity(
-                        opacity: 0.15,
-                        child: Image.asset(
-                          'assets/images/natdemy_logo2.png',
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container();
-                          },
-                        ),
+                child: (_isLoadingBanners || _banners.isEmpty)
+                    ? _buildBannerPlaceholder(context)
+                    : BannerCarousel(
+                        banners: _banners,
+                        student: widget.student,
                       ),
-                    ),
-                    // Animated gradient overlay
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topRight,
-                            end: Alignment.bottomLeft,
-                            colors: [
-                              Colors.white.withOpacity(0.1),
-                              Colors.transparent,
-                              Colors.white.withOpacity(0.05),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Decorative elements
-                    Positioned(
-                      right: -80,
-                      top: -80,
-                      child: Container(
-                        width: 250,
-                        height: 250,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              Colors.white.withOpacity(0.15),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: 40,
-                      bottom: -60,
-                      child: Container(
-                        width: 150,
-                        height: 150,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              const Color(0xFFA1C95C).withOpacity(0.2),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: -40,
-                      top: 40,
-                      child: Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.08),
-                        ),
-                      ),
-                    ),
-                    // Main content
-                  Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: kIsWeb ? 48 : 28,
-                        vertical: kIsWeb ? 20 : 12,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                      children: [
-                          // Badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.25),
-                              borderRadius: BorderRadius.circular(25),
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(3),
-                                  decoration: BoxDecoration(
-                          color: const Color(0xFFA1C95C),
-                                    shape: BoxShape.circle,
-                          ),
-                                  child: const Icon(
-                                    Icons.school_rounded,
-                                    color: Colors.white,
-                                    size: 12,
-                                  ),
-                        ),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: Text(
-                                    'Premium Learning Platform',
-                          style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: kIsWeb ? 13 : 11,
-                                      fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                                      shadows: [
-                                        Shadow(
-                                          color: Colors.black.withOpacity(0.3),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 1),
-                                        ),
-                                      ],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: kIsWeb ? 8 : 8),
-                          // Main title with gradient
-                          ShaderMask(
-                            shaderCallback: (bounds) => const LinearGradient(
-                              colors: [Colors.white, Color(0xFFA1C95C)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ).createShader(bounds),
-                            child: Text(
-                              'NATDEMY',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: kIsWeb ? 48 : 36,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.5,
-                                fontStyle: FontStyle.italic,
-                                height: 1.0,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black.withOpacity(0.3),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: kIsWeb ? 4 : 3),
-                          // Tagline
-                        Text(
-                            'Learn Any Time, Any Where',
-                        style: TextStyle(
-                              color: Colors.white,
-                              fontSize: kIsWeb ? 18 : 14,
-                            fontWeight: FontWeight.w700,
-                              letterSpacing: 0.8,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withOpacity(0.5),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                        ),
-                          SizedBox(height: kIsWeb ? 8 : 8),
-                          // Welcome text in row
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                      Text(
-                                'Welcome',
-                          style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: kIsWeb ? 16 : 14,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black.withOpacity(0.5),
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  widget.student.name.isEmpty ? 'Student' : widget.student.name,
-                                  style: TextStyle(
-                                    color: const Color(0xFFA1C95C),
-                                    fontSize: kIsWeb ? 24 : 22,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.5,
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black.withOpacity(0.5),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                                ),
-                        ),
-                      ],
-                    ),
-                          SizedBox(height: kIsWeb ? 8 : 8),
-                          // CTA with icon
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.rocket_launch_rounded,
-                                color: const Color(0xFFA1C95C),
-                                size: kIsWeb ? 18 : 16,
-                              ),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  'Your learning journey starts here',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: kIsWeb ? 16 : 13,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.5,
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black.withOpacity(0.5),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               ),
             ),
           ),
         ),
-
         // Courses Header
         SliverToBoxAdapter(
-          child: Responsive.constrainWidth(
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                Responsive.getHorizontalPadding(context),
-                16,
-                Responsive.getHorizontalPadding(context),
-                8,
-              ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'POPULAR COURSES',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontSize: kIsWeb ? 28 : null,
-                  ),
+          child: AppAnimations.fadeSlideIn(
+            child: Responsive.constrainWidth(
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  Responsive.getHorizontalPadding(context),
+                  16,
+                  Responsive.getHorizontalPadding(context),
+                  8,
                 ),
-                Row(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    if (_isLoading)
-                      const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else if (_errorMessage == null)
-                      IconButton(
-                        icon: const Icon(Icons.refresh, size: 20),
-                        onPressed: _loadCourses,
-                        tooltip: 'Refresh courses',
+                    Text(
+                      'POPULAR COURSES',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: kIsWeb ? 28 : null,
                       ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const AllCoursesPage()),
-                        );
-                      },
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF000000),
-                        textStyle: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                    ),
+                    Row(
+                      children: [
+                        if (_isLoading)
+                          const Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: ThemePulsingDotsIndicator(size: 8.0, spacing: 8.0),
+                          )
+                        else if (_errorMessage == null)
+                          IconButton(
+                            icon: const Icon(Icons.refresh, size: 20),
+                            onPressed: _refreshAllHomeData,
+                            tooltip: 'Refresh home data',
+                          ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              SlidePageRoute(
+                                builder: (_) => const AllCoursesPage(),
+                                direction: SlideDirection.right,
+                              ),
+                            );
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF000000),
+                            textStyle: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          child: const Text('See All'),
                         ),
-                      ),
-                      child: const Text('See All'),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
             ),
           ),
         ),
@@ -1192,7 +1322,7 @@ _isLoadingTestimonials = false;
                         ),
                       ),
                       TextButton(
-                        onPressed: _loadCourses,
+                        onPressed: () => _loadCourses(forceNetwork: true),
                         child: const Text('Retry'),
                       ),
                     ],
@@ -1207,7 +1337,9 @@ _isLoadingTestimonials = false;
           const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.all(32),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(
+                child: ThemePulsingDotsIndicator(size: 12.0, spacing: 16.0),
+              ),
             ),
           )
         else if (courses.isEmpty)
@@ -1236,12 +1368,15 @@ _isLoadingTestimonials = false;
                 crossAxisCount: Responsive.getGridColumns(context),
                 mainAxisSpacing: Responsive.getCardSpacing(context),
                 crossAxisSpacing: Responsive.getCardSpacing(context),
-                childAspectRatio: kIsWeb ? 0.75 : 1.15,
+                childAspectRatio: kIsWeb ? 0.65 : 1.0,
               ),
               delegate: SliverChildBuilderDelegate(
                 (BuildContext context, int index) {
                   final c = courses[index];
-                  return _CourseCard(course: c);
+                  return AnimatedListItem(
+                    index: index,
+                    child: _CourseCard(course: c),
+                  );
                 },
                 childCount: courses.length,
               ),
@@ -1250,30 +1385,35 @@ _isLoadingTestimonials = false;
 
         // Contact Section Header
         SliverToBoxAdapter(
-          child: Responsive.constrainWidth(
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                Responsive.getHorizontalPadding(context),
-                32,
-                Responsive.getHorizontalPadding(context),
-                8,
+          child: AppAnimations.slideInLeft(
+            delay: 200,
+            child: Responsive.constrainWidth(
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  Responsive.getHorizontalPadding(context),
+                  32,
+                  Responsive.getHorizontalPadding(context),
+                  8,
+                ),
+                child: Text(
+                  'NEED ASSISTANCE?',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
+                    fontSize: kIsWeb ? 28 : null,
+                  ),
+                ),
               ),
-            child: Text(
-              'NEED ASSISTANCE?',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-                fontSize: kIsWeb ? 28 : null,
-              ),
-            ),
             ),
           ),
         ),
 
         // Contact and WhatsApp Cards Section (Side by Side on Web)
         SliverToBoxAdapter(
-          child: Responsive.constrainWidth(
-            Padding(
+          child: AppAnimations.fadeSlideIn(
+            delay: 250,
+            child: Responsive.constrainWidth(
+              Padding(
               padding: EdgeInsets.fromLTRB(
                 Responsive.getHorizontalPadding(context),
                 16,
@@ -1285,145 +1425,114 @@ _isLoadingTestimonials = false;
                 children: [
                 // Contact Card
                 Expanded(
-            child: Card(
-                    elevation: kIsWeb ? 4 : 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
-                    ),
-              child: Container(
-                decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Padding(
-                        padding: EdgeInsets.all(kIsWeb ? 32 : 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                                  padding: EdgeInsets.all(kIsWeb ? 16 : 12),
+                  child: FutureBuilder(
+                    future: ContactService.getContactInfo(),
+                    builder: (context, snapshot) {
+                      final contactInfo = snapshot.data ?? ContactInfo.getDefault();
+
+                      return Card(
+                        elevation: kIsWeb ? 4 : 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
+                        ),
+                        child: Container(
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                              borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
                             ),
-                                  child: Icon(
-                                    Icons.support_agent,
-                                    color: Colors.white,
-                                    size: kIsWeb ? 28 : 24,
-                          ),
-                                ),
-                                SizedBox(width: kIsWeb ? 16 : 12),
-                                Expanded(
-                            child: Text(
-                              'Get in Touch',
-                              style: TextStyle(
-                                color: Colors.white,
-                                      fontSize: kIsWeb ? 26 : 22,
-                                fontWeight: FontWeight.w700,
+                            child: Padding(
+                              padding: EdgeInsets.all(kIsWeb ? 32 : 24),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: EdgeInsets.all(kIsWeb ? 16 : 12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                                        ),
+                                        child: Icon(
+                                          Icons.support_agent,
+                                          color: Colors.white,
+                                          size: kIsWeb ? 28 : 24,
+                                        ),
+                                      ),
+                                      SizedBox(width: kIsWeb ? 16 : 12),
+                                      Expanded(
+                                        child: Text(
+                                          'Get in Touch',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: kIsWeb ? 26 : 22,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: kIsWeb ? 20 : 16),
+                                  Text(
+                                    'Our support team is here to help you 24/7. Reach out anytime for assistance with your learning journey.',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: kIsWeb ? 16 : 14,
+                                      height: 1.5,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  SizedBox(height: kIsWeb ? 32 : 24),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () async {
+                                        if (!context.mounted) return;
+                                        await _showContactDialog(context);
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.white.withOpacity(0.2),
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: kIsWeb ? 20 : 16,
+                                          horizontal: kIsWeb ? 24 : 16,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                                          side: const BorderSide(color: Color(0xFF582DB0), width: 1),
+                                        ),
+                                      ),
+                                      icon: AppAnimations.pulse(
+                                        child: FaIcon(
+                                          FontAwesomeIcons.whatsapp,
+                                          size: kIsWeb ? 24 : 20,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      label: Text(
+                                        'WhatsApp Support',
+                                        style: TextStyle(
+                                          fontSize: kIsWeb ? 18 : 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                            SizedBox(height: kIsWeb ? 20 : 16),
-                            Text(
-                        'Our support team is here to help you 24/7. Reach out anytime for assistance with your learning journey.',
-                        style: TextStyle(
-                          color: Colors.white70,
-                                fontSize: kIsWeb ? 16 : 14,
-                          height: 1.5,
-                          fontWeight: FontWeight.w400,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                            SizedBox(height: kIsWeb ? 32 : 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final whatsappNum = _cleanWhatsAppNumber('+91 9207666614');
-                            final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
-                            final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
-                            await _launchUrl(uri);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white.withOpacity(0.2),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: kIsWeb ? 20 : 16,
-                                    horizontal: kIsWeb ? 24 : 16,
-                                  ),
-                            shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
-                              side: const BorderSide(color: Color(0xFF582DB0), width: 1),
-                            ),
-                          ),
-                                icon: FaIcon(
-                                  FontAwesomeIcons.whatsapp,
-                                  size: kIsWeb ? 24 : 20,
-                                  color: Colors.white,
-                                ),
-                          label: Text(
-                            'WhatsApp Support',
-                                  style: TextStyle(
-                                    fontSize: kIsWeb ? 18 : 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final whatsappNum = _cleanWhatsAppNumber('+91 9207666614');
-                            final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
-                            final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
-                            await _launchUrl(uri);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white.withOpacity(0.2),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: kIsWeb ? 20 : 16,
-                                    horizontal: kIsWeb ? 24 : 16,
-                                  ),
-                            shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
-                              side: const BorderSide(color: Color(0xFF582DB0), width: 1),
-                            ),
-                          ),
-                                icon: FaIcon(
-                                  FontAwesomeIcons.whatsapp,
-                                  size: kIsWeb ? 24 : 20,
-                                  color: Colors.white,
-                                ),
-                                label: Text(
-                            'WhatsApp Support',
-                                  style: TextStyle(
-                                    fontSize: kIsWeb ? 18 : 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ],
+                        );
+                    },
                   ),
                 ),
-              ),
-            ),
-          ),
                 // Spacing between cards
                 SizedBox(width: kIsWeb ? 24 : 0),
         // WhatsApp Group Card
@@ -1459,11 +1568,13 @@ _isLoadingTestimonials = false;
                               color: Colors.white.withOpacity(0.2),
                                     borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
                             ),
-                                  child: FaIcon(
-                              FontAwesomeIcons.whatsapp,
-                              color: Colors.white,
-                                    size: kIsWeb ? 32 : 28,
-                            ),
+                                  child: AppAnimations.pulse(
+                                    child: FaIcon(
+                                      FontAwesomeIcons.whatsapp,
+                                      color: Colors.white,
+                                      size: kIsWeb ? 32 : 28,
+                                    ),
+                                  ),
                           ),
                                 SizedBox(width: kIsWeb ? 20 : 16),
                                 Expanded(
@@ -1524,9 +1635,11 @@ _isLoadingTestimonials = false;
                                     borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
                                   ),
                                 ),
-                                icon: FaIcon(
-                                  FontAwesomeIcons.whatsapp,
-                                  size: kIsWeb ? 24 : 20,
+                                icon: AppAnimations.pulse(
+                                  child: FaIcon(
+                                    FontAwesomeIcons.whatsapp,
+                                    size: kIsWeb ? 24 : 20,
+                                  ),
                                 ),
                                 label: Text(
                             'Join WhatsApp Group',
@@ -1547,143 +1660,110 @@ _isLoadingTestimonials = false;
             ) : Column(
               children: [
                 // Contact Card
-                Card(
-                  elevation: kIsWeb ? 4 : 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                FutureBuilder(
+                  future: ContactService.getContactInfo(),
+                  builder: (context, snapshot) {
+                    final contactInfo = snapshot.data ?? ContactInfo.getDefault();
+
+                    return Card(
+                      elevation: kIsWeb ? 4 : 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
                       ),
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.all(kIsWeb ? 32 : 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: EdgeInsets.all(kIsWeb ? 16 : 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: Padding(
+                            padding: EdgeInsets.all(kIsWeb ? 32 : 24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.all(kIsWeb ? 16 : 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                                      ),
+                                      child: Icon(
+                                        Icons.support_agent,
+                                        color: Colors.white,
+                                        size: kIsWeb ? 28 : 24,
+                                      ),
+                                    ),
+                                    SizedBox(width: kIsWeb ? 16 : 12),
+                                    Expanded(
+                                      child: Text(
+                                        'Get in Touch',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: kIsWeb ? 26 : 22,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                child: Icon(
-                                  Icons.support_agent,
-                                  color: Colors.white,
-                                  size: kIsWeb ? 28 : 24,
-                                ),
-                              ),
-                              SizedBox(width: kIsWeb ? 16 : 12),
-                              Expanded(
-                                child: Text(
-                                  'Get in Touch',
+                                SizedBox(height: kIsWeb ? 20 : 16),
+                                Text(
+                                  'Our support team is here to help you 24/7. Reach out anytime for assistance with your learning journey.',
                                   style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: kIsWeb ? 26 : 22,
-                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white70,
+                                    fontSize: kIsWeb ? 16 : 14,
+                                    height: 1.5,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                SizedBox(height: kIsWeb ? 32 : 24),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      if (!context.mounted) return;
+                                      await _showContactDialog(context);
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white.withOpacity(0.2),
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: kIsWeb ? 20 : 16,
+                                        horizontal: kIsWeb ? 24 : 16,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                                        side: const BorderSide(color: Color(0xFF582DB0), width: 1),
+                                      ),
+                                    ),
+                                    icon: FaIcon(
+                                      FontAwesomeIcons.whatsapp,
+                                      size: kIsWeb ? 24 : 20,
+                                      color: Colors.white,
+                                    ),
+                                    label: Text(
+                                      'WhatsApp Support',
+                                      style: TextStyle(
+                                        fontSize: kIsWeb ? 18 : 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: kIsWeb ? 20 : 16),
-                          Text(
-                            'Our support team is here to help you 24/7. Reach out anytime for assistance with your learning journey.',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: kIsWeb ? 16 : 14,
-                              height: 1.5,
-                              fontWeight: FontWeight.w400,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          SizedBox(height: kIsWeb ? 32 : 24),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                final whatsappNum = _cleanWhatsAppNumber('+91 9207666614');
-                                final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
-                                final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
-                                await _launchUrl(uri);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white.withOpacity(0.2),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: EdgeInsets.symmetric(
-                                  vertical: kIsWeb ? 20 : 16,
-                                  horizontal: kIsWeb ? 24 : 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
-                                  side: const BorderSide(color: Color(0xFF582DB0), width: 1),
-                                ),
-                              ),
-                              icon: FaIcon(
-                                FontAwesomeIcons.whatsapp,
-                                size: kIsWeb ? 24 : 20,
-                                color: Colors.white,
-                              ),
-                              label: Text(
-                                'WhatsApp Support',
-                                style: TextStyle(
-                                  fontSize: kIsWeb ? 18 : 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                final whatsappNum = _cleanWhatsAppNumber('+91 9207666614');
-                                final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
-                                final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
-                                await _launchUrl(uri);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white.withOpacity(0.2),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: EdgeInsets.symmetric(
-                                  vertical: kIsWeb ? 20 : 16,
-                                  horizontal: kIsWeb ? 24 : 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
-                                  side: const BorderSide(color: Color(0xFF582DB0), width: 1),
-                                ),
-                              ),
-                              icon: FaIcon(
-                                FontAwesomeIcons.whatsapp,
-                                size: kIsWeb ? 24 : 20,
-                                color: Colors.white,
-                              ),
-                              label: Text(
-                                'WhatsApp Support',
-                                style: TextStyle(
-                                  fontSize: kIsWeb ? 18 : 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                        ),
+                      );
+                  },
                 ),
                 const SizedBox(height: 16),
                 // WhatsApp Group Card
@@ -1803,240 +1883,324 @@ _isLoadingTestimonials = false;
                 ),
               ],
             ),
+              ),
             ),
           ),
         ),
 
         // Testimonials Section - At the End
         SliverToBoxAdapter(
-          child: Responsive.constrainWidth(
-            Container(
-              margin: EdgeInsets.only(
-                top: 48,
-                bottom: 24,
-                left: Responsive.getHorizontalPadding(context),
-                right: Responsive.getHorizontalPadding(context),
-              ),
-            child: Column(
-              children: [
-                // Section Header
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 4,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF582DB0),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Student Testimonials',
-                        style: TextStyle(
-                          fontSize: kIsWeb ? 26 : 22,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF1E293B),
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
+          child: AppAnimations.fadeScaleIn(
+            delay: 300,
+            child: Responsive.constrainWidth(
+              Container(
+                margin: EdgeInsets.only(
+                  top: 48,
+                  bottom: 24,
+                  left: Responsive.getHorizontalPadding(context),
+                  right: Responsive.getHorizontalPadding(context),
                 ),
-                const SizedBox(height: 24),
-
-                // Testimonials Carousel
-                if (_isLoadingTestimonials)
-                  const Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (_testimonials.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Center(
-                      child: Column(
+                child: Column(
+                  children: [
+                    // Section Header
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
                         children: [
-                          Icon(Icons.format_quote, size: 48, color: Colors.grey[400]),
-                          const SizedBox(height: 16),
+                          Container(
+                            width: 4,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF582DB0),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
                           Text(
-                            'No testimonials available yet',
-                            style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                            'Student Testimonials',
+                            style: TextStyle(
+                              fontSize: kIsWeb ? 26 : 22,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF1E293B),
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  )
-                else
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _testimonials.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 20),
-                    itemBuilder: (context, index) {
-                      final testimonial = _testimonials[index];
-                      return MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(kIsWeb ? 0.08 : 0.05),
-                                blurRadius: kIsWeb ? 16 : 10,
-                                spreadRadius: kIsWeb ? 1 : 0,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Padding(
-                            padding: EdgeInsets.all(kIsWeb ? 28 : 20),
+                    const SizedBox(height: 24),
+
+                    // Testimonials Carousel
+                    if (_isLoadingTestimonials)
+                      const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Center(
+                          child: ThemePulsingDotsIndicator(size: 12.0, spacing: 16.0),
+                        ),
+                      )
+                    else if (_testimonials.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Center(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Top Row: Profile (left) and Rating (right)
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Profile Info - Top Left
-                                  Row(
-                                    children: [
-                                      // Profile Image
-                                      CircleAvatar(
-                                        radius: kIsWeb ? 24 : 20,
-                                        backgroundColor: const Color(0xFF582DB0),
-                                        backgroundImage: testimonial.imageUrl != null &&
-                                                testimonial.imageUrl!.isNotEmpty
-                                            ? NetworkImage(testimonial.imageUrl!)
-                                            : null,
-                                        child: testimonial.imageUrl == null ||
-                                                testimonial.imageUrl!.isEmpty
-                                            ? Text(
-                                                testimonial.name.isNotEmpty
-                                                    ? testimonial.name[0].toUpperCase()
-                                                    : '?',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: kIsWeb ? 18 : 16,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              )
-                                            : null,
-                                      ),
-                                      SizedBox(width: kIsWeb ? 16 : 12),
-                                      // Name and Department
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            testimonial.name,
-                                            style: TextStyle(
-                                              fontSize: kIsWeb ? 16 : 14,
-                                              fontWeight: FontWeight.w700,
-                                              color: const Color(0xFF1E293B),
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          if (testimonial.department != null &&
-                                              testimonial.department!.isNotEmpty)
-                                            Text(
-                                              testimonial.department!,
-                                              style: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: kIsWeb ? 13 : 12,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  // Rating - Top Right
-                                  RatingStars(
-                                    rating: testimonial.rating.toDouble(),
-                                    starSize: kIsWeb ? 18 : 16,
-                                    showValue: false,
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                  ),
-                                ],
-                              ),
+                              Icon(Icons.format_quote, size: 48, color: Colors.grey[400]),
                               const SizedBox(height: 16),
-                              // Testimonial Text - Full text at bottom
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Left Quote Icon
-                                  Container(
-                                    padding: EdgeInsets.all(kIsWeb ? 10 : 8),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF582DB0).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(kIsWeb ? 14 : 12),
-                                    ),
-                                    child: Icon(
-                                      Icons.format_quote,
-                                      color: const Color(0xFF582DB0),
-                                      size: kIsWeb ? 28 : 24,
-                                    ),
-                                  ),
-                                  SizedBox(width: kIsWeb ? 16 : 12),
-                                  // Text Content
-                                  Expanded(
-                                    child: Text(
-                                      testimonial.content,
-                                      style: TextStyle(
-                                        fontSize: kIsWeb ? 16 : 14,
-                                        color: Colors.grey[800],
-                                        height: 1.7,
-                                        fontWeight: FontWeight.w400,
-                                        letterSpacing: 0.2,
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: kIsWeb ? 16 : 12),
-                                  // Right Quote Icon
-                                  Container(
-                                    padding: EdgeInsets.all(kIsWeb ? 10 : 8),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF582DB0).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(kIsWeb ? 14 : 12),
-                                    ),
-                                    child: Transform.rotate(
-                                      angle: 3.14159, // 180 degrees
-                                      child: Icon(
-                                        Icons.format_quote,
-                                        color: const Color(0xFF582DB0),
-                                        size: kIsWeb ? 28 : 24,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                'No testimonials available yet',
+                                style: TextStyle(color: Colors.grey[600], fontSize: 16),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    );
-                    },
-                  ),
-                ],
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: kIsWeb ? 620 : 340,
+                            ),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final double cardWidth = constraints.maxWidth;
+                                final int safeIndex = _currentTestimonialIndex
+                                    .clamp(0, _testimonials.length - 1)
+                                    .toInt();
+                                final Testimonial activeTestimonial = _testimonials[safeIndex];
+                                final double cardHeight = _calculateTestimonialCardHeight(
+                                  cardWidth,
+                                  activeTestimonial,
+                                  context,
+                                );
+
+                                return Column(
+                                  children: [
+                                    AnimatedSize(
+                                      duration: const Duration(milliseconds: 250),
+                                      curve: Curves.easeInOut,
+                                      child: SizedBox(
+                                        height: cardHeight,
+                                        child: PageView.builder(
+                                          controller: _testimonialPageController,
+                                          itemCount: _testimonials.length,
+                                          onPageChanged: (index) {
+                                            setState(() {
+                                              _currentTestimonialIndex = index;
+                                            });
+                                          },
+                                          itemBuilder: (context, index) {
+                                            final testimonial = _testimonials[index];
+                                            return Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                                              child: AnimatedListItem(
+                                                index: index,
+                                                child: MouseRegion(
+                                                  cursor: kIsWeb ? SystemMouseCursors.click : MouseCursor.defer,
+                                                  child: AnimatedContainer(
+                                                    duration: const Duration(milliseconds: 200),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white,
+                                                      borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: Colors.black.withOpacity(kIsWeb ? 0.08 : 0.05),
+                                                          blurRadius: kIsWeb ? 16 : 10,
+                                                          spreadRadius: kIsWeb ? 1 : 0,
+                                                          offset: const Offset(0, 4),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: Padding(
+                                                      padding: EdgeInsets.symmetric(
+                                                        horizontal: kIsWeb ? 16 : 12,
+                                                        vertical: kIsWeb ? 14 : 10,
+                                                      ),
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Row(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              CircleAvatar(
+                                                                radius: kIsWeb ? 18 : 16,
+                                                                backgroundColor: const Color(0xFF582DB0),
+                                                                backgroundImage: testimonial.imageUrl != null &&
+                                                                        testimonial.imageUrl!.isNotEmpty
+                                                                    ? NetworkImage(testimonial.imageUrl!)
+                                                                    : null,
+                                                                child: testimonial.imageUrl == null ||
+                                                                        testimonial.imageUrl!.isEmpty
+                                                                    ? Text(
+                                                                        testimonial.name.isNotEmpty
+                                                                            ? testimonial.name[0].toUpperCase()
+                                                                            : '?',
+                                                                        style: TextStyle(
+                                                                          color: Colors.white,
+                                                                          fontSize: kIsWeb ? 16 : 14,
+                                                                          fontWeight: FontWeight.bold,
+                                                                        ),
+                                                                      )
+                                                                    : null,
+                                                              ),
+                                                              const SizedBox(width: 10),
+                                                              Expanded(
+                                                                child: Column(
+                                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                                  children: [
+                                                                    Text(
+                                                                      testimonial.name,
+                                                                      style: TextStyle(
+                                                                        fontSize: kIsWeb ? 15 : 13,
+                                                                        fontWeight: FontWeight.w700,
+                                                                        color: const Color(0xFF1E293B),
+                                                                      ),
+                                                                      maxLines: 1,
+                                                                      overflow: TextOverflow.ellipsis,
+                                                                    ),
+                                                                    if (testimonial.department != null &&
+                                                                        testimonial.department!.isNotEmpty)
+                                                                      Text(
+                                                                        testimonial.department!,
+                                                                        style: TextStyle(
+                                                                          color: Colors.grey[600],
+                                                                          fontSize: kIsWeb ? 12 : 11,
+                                                                        ),
+                                                                        maxLines: 1,
+                                                                        overflow: TextOverflow.ellipsis,
+                                                                      ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                              const SizedBox(width: 6),
+                                                              SizedBox(
+                                                                width: kIsWeb ? 80 : 68,
+                                                                child: RatingStars(
+                                                                  rating: testimonial.rating.toDouble(),
+                                                                  starSize: kIsWeb ? 14 : 12,
+                                                                  showValue: false,
+                                                                  mainAxisAlignment: MainAxisAlignment.end,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          const SizedBox(height: 16),
+                                                          Row(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              Container(
+                                                                padding: EdgeInsets.all(kIsWeb ? 8 : 6),
+                                                                decoration: BoxDecoration(
+                                                                  color: const Color(0xFF582DB0).withOpacity(0.1),
+                                                                  borderRadius:
+                                                                      BorderRadius.circular(kIsWeb ? 12 : 10),
+                                                                ),
+                                                                child: Icon(
+                                                                  Icons.format_quote,
+                                                                  color: const Color(0xFF582DB0),
+                                                                  size: kIsWeb ? 24 : 20,
+                                                                ),
+                                                              ),
+                                                              SizedBox(width: kIsWeb ? 12 : 10),
+                                                              Expanded(
+                                                                child: Text(
+                                                                  testimonial.content.trim(),
+                                                                  style: TextStyle(
+                                                                    fontSize: kIsWeb ? 14.5 : 12.5,
+                                                                    color: Colors.grey[800],
+                                                                    height: 1.45,
+                                                                    fontWeight: FontWeight.w400,
+                                                                    letterSpacing: 0.2,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                              SizedBox(width: kIsWeb ? 12 : 10),
+                                                              Container(
+                                                                padding: EdgeInsets.all(kIsWeb ? 8 : 6),
+                                                                decoration: BoxDecoration(
+                                                                  color: const Color(0xFF582DB0).withOpacity(0.1),
+                                                                  borderRadius:
+                                                                      BorderRadius.circular(kIsWeb ? 12 : 10),
+                                                                ),
+                                                                child: Transform.rotate(
+                                                                  angle: math.pi,
+                                                                  child: Icon(
+                                                                    Icons.format_quote,
+                                                                    color: const Color(0xFF582DB0),
+                                                                    size: kIsWeb ? 24 : 20,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          SizedBox(height: kIsWeb ? 22 : 18),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: List.generate(_testimonials.length, (index) {
+                                        final isActive = index == _currentTestimonialIndex;
+                                        return AnimatedContainer(
+                                          duration: const Duration(milliseconds: 200),
+                                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                                          height: 8,
+                                          width: isActive ? 24 : 8,
+                                          decoration: BoxDecoration(
+                                            color: isActive ? const Color(0xFF582DB0) : Colors.grey[300],
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                        );
+                                      }),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      )
+                  ],
+                ),
               ),
             ),
-            ),
           ),
+        ),
 
         SliverToBoxAdapter(
-          child: SizedBox(height: kIsWeb ? 40 : MediaQuery.of(context).padding.bottom + 100),
+          child: SizedBox(
+            height: kIsWeb ? 40 : MediaQuery.of(context).padding.bottom + 100,
+          ),
         ),
       ],
     );
+  }
+  Future<void> _refreshAllHomeData() async {
+    debugPrint('🔄 Refreshing entire home data...');
+    setState(() {
+      _isLoading = true;
+      _isLoadingContact = true;
+      _isLoadingTestimonials = true;
+      _isLoadingBanners = true;
+      _errorMessage = null;
+    });
+
+    await Future.wait(<Future>[
+      _loadCourses(forceNetwork: true),
+      _loadContactInfo(),
+      _loadTestimonials(),
+      _loadBanners(forceNetwork: true),
+    ]);
   }
 }
 
@@ -2058,8 +2222,9 @@ class _CourseCard extends StatelessWidget {
       child: InkWell(
         onTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute(
+            SlidePageRoute(
               builder: (_) => CourseDetailPage(course: course),
+              direction: SlideDirection.right,
             ),
           );
         },
@@ -2149,59 +2314,61 @@ class _ContactItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.2),
-            width: 1,
+    return AppAnimations.scaleIn(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.2),
+              width: 1,
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(10),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: Colors.white, size: 20),
               ),
-              child: Icon(icon, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const Icon(
-              Icons.chevron_right,
-              color: Colors.white70,
-              size: 20,
-            ),
-          ],
+              const Icon(
+                Icons.chevron_right,
+                color: Colors.white70,
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2550,7 +2717,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.all(16.0),
-                        child: CircularProgressIndicator(),
+                        child: ThemePulsingDotsIndicator(size: 10.0, spacing: 12.0),
                       ),
                     )
                   else if (_streamError != null)
@@ -2928,3 +3095,4 @@ class _ProfileMenuItem extends StatelessWidget {
     );
   }
 }
+

@@ -434,38 +434,57 @@ class JoinedCourses {
       // Force refresh even if email matches and we have data
       await _loadCourses(forceRefresh: true);
     } else {
-      // Even if not forcing refresh, always check verified status from API
-      // This ensures verified status updates are reflected immediately
-      debugPrint('🔄 Checking verified status from API...');
-      try {
-        final apiCourses = await _loadCoursesFromAPI();
-        // Update courses if verified status changed
-        bool hasChanges = false;
-        for (final apiCourse in apiCourses) {
-          final existingIndex = _joined.indexWhere(
-            (c) => c.courseId == apiCourse.courseId && c.streamId == apiCourse.streamId,
-          );
-          if (existingIndex >= 0) {
-            final existing = _joined[existingIndex];
-            if (existing.isEnrolled != apiCourse.isEnrolled) {
-              _joined[existingIndex] = apiCourse;
-              hasChanges = true;
-              debugPrint('🔄 Updated verified status for course ${apiCourse.title}: ${apiCourse.isEnrolled ? "unlocked" : "locked"}');
-            }
-          }
-        }
-        if (hasChanges) {
-          await _saveCourses();
-        }
-      } catch (e) {
-        debugPrint('⚠️ Error checking verified status: $e');
+      // Skip API call if we already have data - verified status check is expensive
+      // Only check if courses list is empty or we need to verify status
+      // This significantly improves performance on subsequent loads
+      if (_joined.isEmpty) {
+        // Only load if we have no courses
+        await _loadCourses(forceRefresh: false);
       }
+      // Otherwise, use cached data - much faster!
     }
   }
 
   Future<void> _loadCourses({bool forceRefresh = false}) async {
     if (_currentEmail == null) return;
 
+    // Try to load from local storage first (fast) if not forcing refresh
+    if (!forceRefresh) {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'joined_courses_$_currentEmail';
+      final coursesJson = prefs.getString(key);
+
+      if (coursesJson != null && coursesJson.isNotEmpty) {
+        try {
+          final List<dynamic> decoded = json.decode(coursesJson);
+          _joined.clear();
+          _joined.addAll(decoded
+              .map((json) => JoinedCourse.fromJson(json as Map<String, dynamic>))
+              .toList());
+
+          debugPrint('✅ Loaded ${_joined.length} courses from local storage for $_currentEmail');
+          
+          // Refresh from API in background (non-blocking)
+          _loadCoursesFromAPI().then((apiCourses) {
+            if (apiCourses.isNotEmpty) {
+              _joined
+                ..clear()
+                ..addAll(apiCourses);
+              _saveCourses();
+              debugPrint('🔄 Updated ${_joined.length} courses from API in background');
+            }
+          }).catchError((e) {
+            debugPrint('⚠️ Background API refresh failed: $e');
+          });
+          
+          return;
+        } catch (e) {
+          debugPrint('⚠️ Error loading from local storage: $e');
+        }
+      }
+    }
+
+    // Load from API (either force refresh or no cache available)
     int retries = 3;
     for (int i = 0; i < retries; i++) {
       try {
@@ -473,7 +492,6 @@ class JoinedCourses {
           await Future.delayed(Duration(milliseconds: 100 * i));
         }
 
-        // Try to load from API first (always try API if forceRefresh is true)
         try {
           final apiCourses = await _loadCoursesFromAPI();
           _joined
@@ -483,32 +501,10 @@ class JoinedCourses {
           await _saveCourses();
           return;
         } catch (e) {
-          debugPrint('⚠️ Failed to load from API, trying local storage: $e');
+          debugPrint('⚠️ Failed to load from API: $e');
           if (forceRefresh) {
             _joined.clear();
             await _clearCache();
-            return;
-          }
-        }
-
-        // Fallback to local storage only if not forcing refresh
-        if (!forceRefresh) {
-          final prefs = await SharedPreferences.getInstance();
-          final key = 'joined_courses_$_currentEmail';
-          final coursesJson = prefs.getString(key);
-
-          _joined.clear();
-
-          if (coursesJson != null && coursesJson.isNotEmpty) {
-            final List<dynamic> decoded = json.decode(coursesJson);
-            _joined.addAll(decoded
-                .map((json) => JoinedCourse.fromJson(json as Map<String, dynamic>))
-                .toList());
-
-            debugPrint('✅ Loaded ${_joined.length} courses from local storage for $_currentEmail');
-            return;
-          } else {
-            debugPrint('ℹ️ No saved courses found for $_currentEmail');
             return;
           }
         }
@@ -548,9 +544,6 @@ class JoinedCourses {
       try {
         final studentData = await StudentService.fetchStudentDataWithCourseStream(_currentEmail!);
         if (studentData != null) {
-          debugPrint('📋 Student data keys: ${studentData.keys.toList()}');
-          debugPrint('📋 Student data: $studentData');
-          
           // Extract course_id, stream_id, and verified from student data
           int? studentCourseId;
           int? studentStreamId;
@@ -564,7 +557,6 @@ class JoinedCourses {
           // If course is an object, extract its ID
           if (rawCourseId is Map<String, dynamic>) {
             rawCourseId = rawCourseId['id'] ?? rawCourseId['course_id'];
-            debugPrint('📋 Extracted course_id from course object: $rawCourseId');
           }
           
           if (rawCourseId != null) {
@@ -575,9 +567,6 @@ class JoinedCourses {
             } else if (rawCourseId is double) {
               studentCourseId = rawCourseId.toInt();
             }
-            debugPrint('📋 Parsed course_id: $studentCourseId');
-          } else {
-            debugPrint('⚠️ No course_id found in student data');
           }
           
           // Try different possible field names for stream_id
@@ -588,7 +577,6 @@ class JoinedCourses {
           // If stream is an object, extract its ID
           if (rawStreamId is Map<String, dynamic>) {
             rawStreamId = rawStreamId['id'] ?? rawStreamId['stream_id'];
-            debugPrint('📋 Extracted stream_id from stream object: $rawStreamId');
           }
           
           if (rawStreamId != null) {
@@ -599,15 +587,10 @@ class JoinedCourses {
             } else if (rawStreamId is double) {
               studentStreamId = rawStreamId.toInt();
             }
-            debugPrint('📋 Parsed stream_id: $studentStreamId');
-          } else {
-            debugPrint('⚠️ No stream_id found in student data');
           }
           
           // Extract verified/verification field from student data
-          // API uses 'verification' field, but we also check 'verified' for compatibility
           var rawVerified = studentData['verification'] ?? studentData['verified'];
-          debugPrint('📋 Raw verified value: $rawVerified (type: ${rawVerified.runtimeType})');
           if (rawVerified != null) {
             if (rawVerified is bool) {
               studentVerified = rawVerified;
@@ -616,9 +599,6 @@ class JoinedCourses {
             } else if (rawVerified is int) {
               studentVerified = rawVerified == 1;
             }
-            debugPrint('📋 Parsed verified status: $studentVerified');
-          } else {
-            debugPrint('⚠️ Verified/verification field is null or missing');
           }
           
           // Check if we already have an enrollment for this course/stream
@@ -627,51 +607,39 @@ class JoinedCourses {
           
           // If student has course/stream selected, add it (locked or unlocked based on verified)
           if (studentCourseId != null && studentStreamId != null) {
-            debugPrint('🔄 Student has registered course_id=$studentCourseId, stream_id=$studentStreamId, verified=$studentVerified');
             try {
-              // Fetch course details to create a JoinedCourse entry
+              // Fetch courses (this also loads streams into cache)
               final allCourses = await CourseService.fetchCourses();
-              debugPrint('📚 Fetched ${allCourses.length} course(s) from API');
+              
               Course? selectedCourse;
               try {
                 selectedCourse = allCourses.firstWhere((c) => c.id == studentCourseId);
-                debugPrint('✅ Found course: ${selectedCourse.title} (ID: ${selectedCourse.id})');
               } catch (e) {
                 // Course not found, skip
-                debugPrint('⚠️ Course with ID $studentCourseId not found in ${allCourses.length} courses');
-                debugPrint('   Available course IDs: ${allCourses.map((c) => c.id).toList()}');
               }
               
               if (selectedCourse != null) {
                 // Find stream name
                 final streams = CourseService.cachedStreams;
-                debugPrint('🌊 Checking ${streams.length} stream(s) for stream_id=$studentStreamId');
                 CourseStream? selectedStream;
                 try {
                   selectedStream = streams.firstWhere((s) => s.id == studentStreamId);
-                  debugPrint('✅ Found stream: ${selectedStream.name} (ID: ${selectedStream.id})');
                 } catch (e) {
                   // Stream not found, skip
-                  debugPrint('⚠️ Stream with ID $studentStreamId not found in ${streams.length} streams');
-                  debugPrint('   Available stream IDs: ${streams.map((s) => s.id).toList()}');
                 }
                 
                 if (selectedStream != null) {
                   // Determine if course should be locked based on verified field
-                  // If verified is true, course is unlocked; if false or null, it's locked
                   final isEnrolled = studentVerified == true;
                   
-                  debugPrint('📊 Enrollment status: hasEnrollment=$hasEnrollment, isEnrolled=$isEnrolled (verified=$studentVerified)');
-                  
-                  // Fetch chapters for this course/stream from the API
+                  // Skip fetching chapters if enrollment already exists (chapters should be in enrollment)
                   List<CourseChapter> chapters = [];
-                  try {
-                    debugPrint('🔄 Fetching chapters for course ${selectedCourse.id}, stream ${selectedStream.id}...');
-                    chapters = await _fetchChaptersForCourseStream(selectedCourse.id!, selectedStream.id);
-                    debugPrint('✅ Loaded ${chapters.length} chapter(s) for course/stream');
-                  } catch (e) {
-                    debugPrint('⚠️ Failed to fetch chapters: $e');
-                    // Continue without chapters - they'll be empty
+                  if (!hasEnrollment) {
+                    try {
+                      chapters = await _fetchChaptersForCourseStream(selectedCourse.id!, selectedStream.id);
+                    } catch (e) {
+                      // Continue without chapters - they'll be empty
+                    }
                   }
                   
                   // Create course entry (locked or unlocked based on verified status)
@@ -694,26 +662,21 @@ class JoinedCourses {
                     lessonsCount: selectedCourse.lessonsCount,
                     chaptersCount: selectedCourse.chaptersCount,
                     topics: selectedCourse.topics,
-                    chapters: chapters, // Include fetched chapters
-                    isEnrolled: isEnrolled, // Locked if verified != true
+                    chapters: chapters,
+                    isEnrolled: isEnrolled,
                   );
                   
                   // Add course if not already in list
                   if (!hasEnrollment) {
                     enrolledCourses.add(studentCourse);
-                    debugPrint('${isEnrolled ? "✅" : "🔒"} Added ${isEnrolled ? "unlocked" : "locked"} course from student registration: ${studentCourse.title} - ${studentCourse.streamName} (verified: $studentVerified)');
                   } else {
-                    debugPrint('ℹ️ Enrollment already exists for course_id=$studentCourseId, stream_id=$studentStreamId');
                     // Update existing enrollment with verified status from student data
                     final existingIndex = enrolledCourses.indexWhere((c) => 
                       c.courseId == studentCourseId && c.streamId == studentStreamId);
                     if (existingIndex >= 0) {
-                      // Always update isEnrolled based on student's verified status
                       final existingCourse = enrolledCourses[existingIndex];
-                      // Use verified status from student data (if available), otherwise keep existing status
                       final finalIsEnrolled = studentVerified != null ? isEnrolled : existingCourse.isEnrolled;
                       
-                      // Always update to ensure verified status is reflected
                       enrolledCourses[existingIndex] = JoinedCourse(
                         courseId: existingCourse.courseId,
                         title: existingCourse.title,
@@ -735,31 +698,21 @@ class JoinedCourses {
                         enrolledAt: existingCourse.enrolledAt,
                         lastAccessedAt: existingCourse.lastAccessedAt,
                         chapters: existingCourse.chapters,
-                        isEnrolled: finalIsEnrolled, // Always update based on verified status
+                        isEnrolled: finalIsEnrolled,
                       );
-                      debugPrint('🔄 Updated course enrollment status: verified=$studentVerified, isEnrolled=$finalIsEnrolled (${finalIsEnrolled ? "unlocked" : "locked"})');
                     }
                   }
-                } else {
-                  debugPrint('❌ Cannot add course: Stream not found');
                 }
-              } else {
-                debugPrint('❌ Cannot add course: Course not found');
               }
-            } catch (e, stackTrace) {
-              debugPrint('❌ Error adding student registered course: $e');
-              debugPrint('   Stack trace: $stackTrace');
+            } catch (e) {
+              // Silently handle errors
             }
-          } else {
-            debugPrint('⚠️ Student has no course_id or stream_id registered');
           }
         }
-      } catch (e, stackTrace) {
-        debugPrint('⚠️ Error fetching student course/stream data: $e');
-        debugPrint('   Stack trace: $stackTrace');
+      } catch (e) {
+        // Silently handle errors
       }
       
-      debugPrint('📊 Final enrolled courses count: ${enrolledCourses.length}');
       return enrolledCourses;
     } catch (e) {
       debugPrint('❌ Error loading courses from API: $e');

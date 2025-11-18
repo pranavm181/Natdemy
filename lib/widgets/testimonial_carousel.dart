@@ -237,7 +237,7 @@ class _TestimonialCard extends StatelessWidget {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -278,23 +278,19 @@ class _TestimonialCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             // Testimonial content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 12, right: 4),
                 child: Text(
-                  testimonial.content,
+                testimonial.content.trim(),
                   style: TextStyle(
-                    fontSize: 14,
+                  fontSize: 15,
                     color: Colors.grey[800],
                     height: 1.6,
                     fontWeight: FontWeight.w400,
-                  ),
-                  maxLines: 7,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             // Reviewer info
             Row(
               children: [

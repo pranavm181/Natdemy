@@ -76,6 +76,7 @@ flutter:
     - assets/images/natdemy_logo2_crop.png
     - assets/images/flutter_course.jpg
     - assets/images/person-icon-8.png
+    - assets/images/LIGHT LOGO-NAT.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

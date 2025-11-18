@@ -5,6 +5,8 @@ import '../data/material.dart';
 import '../data/joined_courses.dart';
 import '../api/material_service.dart';
 import '../api/course_service.dart';
+import '../widgets/theme_loading_indicator.dart';
+import '../utils/animations.dart';
 import 'pdf_viewer_screen.dart';
 
 class MaterialsPage extends StatefulWidget {
@@ -199,7 +201,7 @@ class _MaterialsPageState extends State<MaterialsPage> {
       body: RefreshIndicator(
         onRefresh: _loadMaterials,
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: ThemePulsingDotsIndicator(size: 12.0, spacing: 16.0))
             : _materials.isEmpty
                 ? Center(
                     child: Column(
@@ -239,7 +241,9 @@ class _MaterialsPageState extends State<MaterialsPage> {
                       final materialUrl = m.url;
                       final fullUrl = MaterialService.getFullMaterialUrl(materialUrl);
                       
-                      return Card(
+                      return AnimatedListItem(
+                        index: index,
+                        child: Card(
                         elevation: 2,
                         shadowColor: Colors.black.withOpacity(0.1),
                         shape: RoundedRectangleBorder(
@@ -327,6 +331,7 @@ class _MaterialsPageState extends State<MaterialsPage> {
                             }
                           },
                         ),
+                      ),
                       );
                     },
                     separatorBuilder: (_, __) => const SizedBox(height: 12),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../data/joined_courses.dart';
 import '../data/auth_helper.dart';
 import '../api/auth_service.dart';
+import '../widgets/theme_loading_indicator.dart';
+import '../utils/animations.dart';
 import 'home.dart';
 import 'signupscreen.dart';
 
@@ -81,28 +83,33 @@ class _LoginScreenState extends State<LoginScreen> {
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 440),
-                child: Card(
-                  elevation: 8,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Image.asset(
-                          'assets/images/natdemy_logo2.png',
-                          height: 80,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(
-                              Icons.school_outlined,
-                              size: 56,
-                              color: Color(0xFF582DB0),
-                            );
-                          },
-                        ),
+                child: AppAnimations.scaleIn(
+                  delay: 100,
+                  child: Card(
+                    elevation: 8,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          AppAnimations.fadeIn(
+                            delay: 150,
+                            child: Image.asset(
+                              'assets/images/natdemy_logo2.png',
+                              height: 80,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(
+                                  Icons.school_outlined,
+                                  size: 56,
+                                  color: Color(0xFF582DB0),
+                                );
+                              },
+                            ),
+                          ),
                         const SizedBox(height: 24),
                         Text(
                           'WELCOME BACK',
@@ -147,13 +154,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: FilledButton.icon(
                             onPressed: _isLoading ? null : _signIn,
                             icon: _isLoading
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
+                                ? const Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: ThemePulsingDotsIndicator(size: 8.0, spacing: 6.0, color: Colors.white),
                                   )
                                 : const Icon(Icons.login, size: 20),
                             label: const Text(
@@ -195,6 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

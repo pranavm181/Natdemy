@@ -8,6 +8,7 @@ import '../api/contact_service.dart';
 import '../api/course_service.dart';
 import '../widgets/rating_stars.dart';
 import '../data/course_stream.dart';
+import '../utils/animations.dart';
 
 class CourseDetailPage extends StatelessWidget {
   const CourseDetailPage({super.key, required this.course});
@@ -61,8 +62,17 @@ class CourseDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final relatedStreams = CourseService.cachedStreams
         .where((stream) {
-          final streamCourseId = stream.course?.id ?? stream.courseId;
-          return streamCourseId == course.id;
+          // Check multiple ways course_id might be stored
+          if (stream.resolvedCourseId == course.id) {
+            return true;
+          }
+          if (stream.courseId == course.id) {
+            return true;
+          }
+          if (stream.course?.id == course.id) {
+            return true;
+          }
+          return false;
         })
         .toList();
 
@@ -82,10 +92,14 @@ class CourseDetailPage extends StatelessWidget {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      body: AppAnimations.fadeSlideIn(
+        delay: 100,
+        child: Column(
+          children: [
+            AppAnimations.scaleIn(
+              delay: 150,
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(16, 16, 16, 16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
@@ -163,6 +177,7 @@ class CourseDetailPage extends StatelessWidget {
               ),
             ),
           ),
+            ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -229,7 +244,9 @@ class CourseDetailPage extends StatelessWidget {
                           final streamCourse = stream.course ?? course;
                           final streamIcon = _getStreamIcon(stream.name, index);
 
-                          return Container(
+                          return AnimatedListItem(
+                            index: index,
+                            child: Container(
                             width: 220,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(20),
@@ -292,6 +309,7 @@ class CourseDetailPage extends StatelessWidget {
                                 ],
                               ),
                             ),
+                          ),
                           );
                         },
                       ),
@@ -355,8 +373,9 @@ class CourseDetailPage extends StatelessWidget {
                 future: ContactService.getContactInfo(),
                 builder: (context, snapshot) {
                   final contactInfo = snapshot.data ?? ContactInfo.getDefault();
-                  // Use specific WhatsApp number: +91 92076 66621
-                  final whatsappNum = '919207666621';
+                  final whatsappNum = _resolveCourseWhatsAppNumber(course, contactInfo);
+                  final displayNumber = _formatWhatsAppDisplay(whatsappNum);
+                  final supportLabel = _resolveCourseSupportLabel(course);
 
                   return SizedBox(
                     width: double.infinity,
@@ -502,6 +521,51 @@ class CourseDetailPage extends StatelessWidget {
                                           ),
                                         ),
                                         const SizedBox(height: 28),
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(10),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFE8F9ED),
+                                                borderRadius: BorderRadius.circular(14),
+                                                border: Border.all(
+                                                  color: const Color(0xFFBFEFCF),
+                                                  width: 1.2,
+                                                ),
+                                              ),
+                                              child: const Icon(
+                                                Icons.phone_android,
+                                                color: Color(0xFF25D366),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    supportLabel,
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF452D8A),
+                                                      fontWeight: FontWeight.w700,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    displayNumber,
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF111827),
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.w800,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 24),
                                         SizedBox(
                                           width: double.infinity,
                                           child: ElevatedButton.icon(
@@ -515,16 +579,16 @@ class CourseDetailPage extends StatelessWidget {
                                               elevation: 4,
                                             ),
                                             icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 20),
-                                            label: const Text(
-                                              'WhatsApp',
-                                              style: TextStyle(
+                                            label: Text(
+                                              'WhatsApp ($displayNumber)',
+                                              style: const TextStyle(
                                                 fontWeight: FontWeight.w800,
                                                 fontSize: 16,
                                               ),
                                             ),
                                             onPressed: () async {
                                               final uri = Uri.parse(
-                                                'https://wa.me/$whatsappNum?text=I%20have%20a%20question%20about%20${Uri.encodeComponent(course.title)}',
+                                                'https://wa.me/$whatsappNum?text=${Uri.encodeComponent('I have a question about ${course.title}')}',
                                               );
                                               Navigator.of(sheetContext).pop();
                                               await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -614,6 +678,7 @@ class CourseDetailPage extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -644,6 +709,61 @@ class CourseDetailPage extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _resolveCourseWhatsAppNumber(Course course, ContactInfo contactInfo) {
+    final title = course.title.toLowerCase();
+    if (title.contains('nios')) {
+      return '919207666621';
+    }
+    if (title.contains('bosse')) {
+      return '919207666623';
+    }
+    if (title.contains('gmvss') || title.contains('gmv')) {
+      return '919207666628';
+    }
+    final fallback = contactInfo.whatsappNumber ??
+        contactInfo.phone ??
+        '+91 92076 666621';
+    return _sanitizeWhatsappDigits(fallback);
+  }
+
+  String _sanitizeWhatsappDigits(String number) {
+    final digits = number.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return '919207666621';
+    if (digits.startsWith('91')) return digits;
+    return '91$digits';
+  }
+
+  String _formatWhatsAppDisplay(String digits) {
+    final cleaned = digits.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleaned.startsWith('91') && cleaned.length > 2) {
+      final local = cleaned.substring(2);
+      if (local.length > 5) {
+        final first = local.substring(0, 5);
+        final second = local.substring(5);
+        return '+91 $first $second';
+      }
+      return '+91 $local';
+    }
+    if (cleaned.isNotEmpty) {
+      return '+$cleaned';
+    }
+    return '+91 92076 66621';
+  }
+
+  String _resolveCourseSupportLabel(Course course) {
+    final title = course.title.toLowerCase();
+    if (title.contains('nios')) {
+      return 'NIOS Support';
+    }
+    if (title.contains('bosse')) {
+      return 'BOSSE Support';
+    }
+    if (title.contains('gmvss') || title.contains('gmv')) {
+      return 'GMVSS Support';
+    }
+    return 'Course Support';
   }
 }
 

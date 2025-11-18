@@ -10,6 +10,8 @@ import '../api/auth_service.dart';
 import '../api/course_service.dart';
 import '../api/student_service.dart';
 import '../api/api_client.dart';
+import '../widgets/theme_loading_indicator.dart';
+import '../utils/animations.dart';
 import 'home.dart';
 import 'loginscreen.dart';
 
@@ -24,6 +26,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _studentIdController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmController = TextEditingController();
   bool _isLoading = false;
@@ -40,6 +43,7 @@ class _SignupScreenState extends State<SignupScreen> {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final phone = _phoneController.text.trim();
+    final studentId = _studentIdController.text.trim();
     final password = _passwordController.text;
     final confirm = _confirmController.text;
     if (name.isEmpty) {
@@ -61,6 +65,10 @@ class _SignupScreenState extends State<SignupScreen> {
     }
     if (phone.length < 7) {
       _showError('Phone number must be at least 7 digits.');
+      return;
+    }
+    if (studentId.isEmpty) {
+      _showError('Please enter your student ID.');
       return;
     }
     if (password.isEmpty) {
@@ -86,9 +94,6 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Auto-generate student ID
-      final studentId = _generateStudentId();
-      
       // Ensure course and stream are selected
       if (_selectedCourse == null || _selectedStream == null) {
         _showError('Please select both course and stream.');
@@ -242,11 +247,6 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  String _generateStudentId() {
-    final timestamp = DateTime.now().microsecondsSinceEpoch.toString();
-    return 'STD$timestamp';
-  }
-
   Future<void> _createEnrollmentForStudent({
     required int studentId,
     required int courseId,
@@ -370,9 +370,26 @@ class _SignupScreenState extends State<SignupScreen> {
       // Filter streams for selected course
       if (course != null && course.id != null) {
         _selectedStream = null; // Reset stream selection
-        _streams = CourseService.cachedStreams
-            .where((stream) => stream.resolvedCourseId == course.id)
-            .toList();
+        
+        // Filter streams - check multiple ways course_id might be stored
+        _streams = CourseService.cachedStreams.where((stream) {
+          // Check resolvedCourseId (handles both course?.id and courseId)
+          if (stream.resolvedCourseId == course.id) {
+            return true;
+          }
+          
+          // Also check direct courseId field
+          if (stream.courseId == course.id) {
+            return true;
+          }
+          
+          // Also check nested course object ID
+          if (stream.course?.id == course.id) {
+            return true;
+          }
+          
+          return false;
+        }).toList();
       } else {
         _streams = CourseService.cachedStreams;
       }
@@ -437,6 +454,16 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         const SizedBox(height: 32),
                         TextField(
+                          controller: _studentIdController,
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            labelText: 'Student ID',
+                            prefixIcon: Icon(Icons.badge_outlined),
+                            helperText: 'Enter the student ID provided to you',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
                           controller: _nameController,
                           textInputAction: TextInputAction.next,
                           decoration: const InputDecoration(
@@ -490,7 +517,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           const Center(
                             child: Padding(
                               padding: EdgeInsets.all(16.0),
-                              child: CircularProgressIndicator(),
+                              child: ThemePulsingDotsIndicator(size: 10.0, spacing: 12.0),
                             ),
                           )
                         else if (_courses.isEmpty)
@@ -607,13 +634,9 @@ class _SignupScreenState extends State<SignupScreen> {
                           child: FilledButton.icon(
                             onPressed: _isLoading ? null : _signUp,
                             icon: _isLoading
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
+                                ? const Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: ThemePulsingDotsIndicator(size: 8.0, spacing: 6.0, color: Colors.white),
                                   )
                                 : const Icon(Icons.person_add_alt_1, size: 20),
                             label: const Text(

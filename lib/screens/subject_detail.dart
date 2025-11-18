@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../data/joined_courses.dart';
 import '../data/lessons_config.dart';
+import '../utils/animations.dart';
 import 'materials_page.dart';
 import 'live_upcoming.dart';
 import 'lesson_detail.dart';
@@ -71,10 +72,14 @@ class SubjectDetailPage extends StatelessWidget {
           ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          GridView.builder(
+      body: AppAnimations.fadeSlideIn(
+        delay: 100,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            AppAnimations.scaleIn(
+              delay: 150,
+              child: GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: actions.length,
@@ -102,6 +107,7 @@ class SubjectDetailPage extends StatelessWidget {
                 ),
               );
             },
+          ),
           ),
           const SizedBox(height: 24),
           Card(
@@ -201,6 +207,7 @@ class SubjectDetailPage extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }

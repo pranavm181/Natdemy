@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../data/joined_courses.dart';
 import '../api/material_service.dart';
+import '../utils/animations.dart';
 import 'pdf_viewer_screen.dart';
 
 class QuestionBankPage extends StatelessWidget {
@@ -60,11 +61,13 @@ class QuestionBankPage extends StatelessWidget {
           ),
         ),
       ),
-      body: mcqs.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+      body: AppAnimations.fadeSlideIn(
+        delay: 100,
+        child: mcqs.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
                   Icon(Icons.quiz_outlined, size: 64, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text(
@@ -80,13 +83,15 @@ class QuestionBankPage extends StatelessWidget {
                 ],
               ),
             )
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemBuilder: (context, index) {
-                final mcq = mcqs[index];
-                final fullUrl = MaterialService.getFullMaterialUrl(mcq.url);
-                
-                return Card(
+            : ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemBuilder: (context, index) {
+                  final mcq = mcqs[index];
+                  final fullUrl = MaterialService.getFullMaterialUrl(mcq.url);
+                  
+                  return AnimatedListItem(
+                    index: index,
+                    child: Card(
                   elevation: 2,
                   shadowColor: Colors.black.withOpacity(0.1),
                   shape: RoundedRectangleBorder(
@@ -155,11 +160,13 @@ class QuestionBankPage extends StatelessWidget {
                       }
                     },
                   ),
+                ),
                 );
               },
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemCount: mcqs.length,
             ),
+      ),
     );
   }
 }

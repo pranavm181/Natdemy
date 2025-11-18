@@ -6,6 +6,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../data/lesson_videos_config.dart';
 import '../data/joined_courses.dart';
 import '../api/material_service.dart';
+import '../utils/animations.dart';
 import 'materials_page.dart';
 import 'pdf_viewer_screen.dart';
 
@@ -125,7 +126,10 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
             ),
           ),
         ),
-        body: const Center(child: Text('No videos available')),
+        body: AppAnimations.fadeSlideIn(
+          delay: 100,
+          child: const Center(child: Text('No videos available')),
+        ),
       );
     }
 
@@ -217,6 +221,186 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                             backgroundColor: Colors.black,
                             onInAppWebViewCreated: (controller) {
                               _webViewController = controller;
+                              
+                              // Wait for video player to load before injecting scripts
+                              Future.delayed(const Duration(milliseconds: 2000), () {
+                                // Inject script to hide/disable ONLY the "Share" option
+                                controller.evaluateJavascript(source: '''
+                                (function() {
+                                  window.hideShareOption = function() {
+                                    try {
+                                      // Only run if video player is loaded
+                                      var videoIframe = document.querySelector('iframe[src*="vimeo"], iframe[src*="player"]');
+                                      if (!videoIframe || !videoIframe.offsetParent) {
+                                        return;
+                                      }
+                                      
+                                      // Inject CSS to hide share options at CSS level
+                                      if (!document.getElementById('hide-share-css')) {
+                                        var style = document.createElement('style');
+                                        style.id = 'hide-share-css';
+                                        style.textContent = `
+                                          [aria-label*="Share" i],
+                                          [title*="Share" i],
+                                          *:has-text("Share"),
+                                          button:has([aria-label*="Share" i]),
+                                          li:has-text("Share"),
+                                          [role="menuitem"]:has-text("Share") {
+                                            display: none !important;
+                                            visibility: hidden !important;
+                                            opacity: 0 !important;
+                                            width: 0 !important;
+                                            height: 0 !important;
+                                            padding: 0 !important;
+                                            margin: 0 !important;
+                                            pointer-events: none !important;
+                                          }
+                                        `;
+                                        (document.head || document.documentElement).appendChild(style);
+                                      }
+                                      
+                                      // Target ALL elements and check for "Share" text
+                                      var allElements = document.querySelectorAll('*');
+                                      allElements.forEach(function(el) {
+                                        try {
+                                          var ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase().trim();
+                                          var title = (el.getAttribute('title') || '').toLowerCase().trim();
+                                          var text = (el.textContent || '').trim().toLowerCase();
+                                          
+                                          // Check if it's the "Share" option - be very specific
+                                          var isShare = false;
+                                          
+                                          // Exact match
+                                          if (ariaLabel === 'share' || title === 'share' || text === 'share') {
+                                            isShare = true;
+                                          }
+                                          
+                                          // Text starts with "share" and is short (likely just "Share")
+                                          if (!isShare && text.startsWith('share') && text.length < 20) {
+                                            // Make sure it's not part of a longer word
+                                            var words = text.split(/[\s\n\r]+/);
+                                            if (words.some(function(word) { return word === 'share'; })) {
+                                              isShare = true;
+                                            }
+                                          }
+                                          
+                                          if (isShare) {
+                                            // Completely hide and remove
+                                            el.style.cssText = 'display: none !important; visibility: hidden !important; opacity: 0 !important; width: 0 !important; height: 0 !important; padding: 0 !important; margin: 0 !important; pointer-events: none !important; position: absolute !important; left: -9999px !important;';
+                                            
+                                            // Remove from DOM
+                                            try {
+                                              if (el.parentNode) {
+                                                el.parentNode.removeChild(el);
+                                              }
+                                            } catch (e) {}
+                                          }
+                                        } catch (e) {}
+                                      });
+                                    } catch (e) {
+                                      console.log('Error hiding share option: ' + e);
+                                    }
+                                  };
+                                  
+                                  // Run immediately
+                                  hideShareOption();
+                                  
+                                  // Run on DOM ready
+                                  if (document.readyState === 'loading') {
+                                    document.addEventListener('DOMContentLoaded', hideShareOption);
+                                  }
+                                  
+                                  // Run on window load
+                                  window.addEventListener('load', hideShareOption);
+                                  
+                                  // Global click interceptor to catch share button clicks
+                                  document.addEventListener('click', function(e) {
+                                    var target = e.target;
+                                    if (target) {
+                                      var text = (target.textContent || '').toLowerCase().trim();
+                                      var ariaLabel = (target.getAttribute('aria-label') || '').toLowerCase().trim();
+                                      var title = (target.getAttribute('title') || '').toLowerCase().trim();
+                                      
+                                      if (text === 'share' || 
+                                          ariaLabel === 'share' || 
+                                          title === 'share' ||
+                                          (text.startsWith('share') && text.length < 15)) {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        e.stopImmediatePropagation();
+                                        return false;
+                                      }
+                                      
+                                      // Also check parent elements
+                                      var parent = target.parentElement;
+                                      if (parent) {
+                                        var parentText = (parent.textContent || '').toLowerCase().trim();
+                                        var parentAriaLabel = (parent.getAttribute('aria-label') || '').toLowerCase().trim();
+                                        if (parentText === 'share' || parentAriaLabel === 'share') {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          e.stopImmediatePropagation();
+                                          return false;
+                                        }
+                                      }
+                                    }
+                                  }, true); // Use capture phase
+                                  
+                                  // MutationObserver to catch dynamically added share options
+                                  var targetNode = document.body || document.documentElement;
+                                  if (targetNode && targetNode.nodeType === 1) {
+                                    var observer = new MutationObserver(function(mutations) {
+                                      var hasMenuChanges = false;
+                                      mutations.forEach(function(mutation) {
+                                        if (mutation.addedNodes.length > 0) {
+                                          mutation.addedNodes.forEach(function(node) {
+                                            if (node.nodeType === 1) {
+                                              var text = (node.textContent || '').toLowerCase();
+                                              if (text.includes('share') || 
+                                                  (node.getAttribute && (node.getAttribute('aria-label') || '').toLowerCase().includes('share'))) {
+                                                hasMenuChanges = true;
+                                              }
+                                            }
+                                          });
+                                        }
+                                      });
+                                      if (hasMenuChanges) {
+                                        hideShareOption();
+                                      }
+                                    });
+                                    
+                                    observer.observe(targetNode, {
+                                      childList: true,
+                                      subtree: true,
+                                      attributes: true,
+                                      attributeFilter: ['aria-label', 'title']
+                                    });
+                                  }
+                                  
+                                  // Check very frequently to catch share options immediately
+                                  var checkCount = 0;
+                                  var intervalId = setInterval(function() {
+                                    checkCount++;
+                                    var iframe = document.querySelector('iframe[src*="vimeo"], iframe[src*="player"]');
+                                    if (iframe && iframe.offsetParent) {
+                                      hideShareOption();
+                                    }
+                                    // Keep checking for longer to catch dynamically opened menus
+                                    if (checkCount > 200) {
+                                      clearInterval(intervalId);
+                                    }
+                                  }, 200);
+                                })();
+                              ''');
+                              });
+                              
+                              // Also inject after delays to catch late-loading share options
+                              Future.delayed(const Duration(milliseconds: 5000), () {
+                                controller.evaluateJavascript(source: 'if (window.hideShareOption) window.hideShareOption();');
+                              });
+                              Future.delayed(const Duration(milliseconds: 8000), () {
+                                controller.evaluateJavascript(source: 'if (window.hideShareOption) window.hideShareOption();');
+                              });
                             },
                           ),
                           // Fullscreen button overlay

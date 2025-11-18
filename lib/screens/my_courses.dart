@@ -7,8 +7,10 @@ import '../data/student.dart';
 import '../utils/course_utils.dart';
 import '../widgets/rating_stars.dart';
 import '../widgets/main_drawer.dart';
+import '../widgets/theme_loading_indicator.dart';
 import '../api/course_service.dart';
 import '../api/contact_service.dart';
+import '../utils/animations.dart';
 import 'subject_detail.dart';
 import 'home.dart';
 
@@ -63,8 +65,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   Future<void> _loadCourses({bool forceRefresh = false}) async {
     try {
       setState(() => _isLoading = true);
-      // Small delay to ensure platform channels are ready
-      await Future.delayed(const Duration(milliseconds: 100));
+      // Remove delay - not needed
       
       // Always check verified status from API (forceRefresh ensures full reload)
       await JoinedCourses.instance.initialize(widget.student.email, forceRefresh: forceRefresh);
@@ -120,7 +121,12 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
             ),
           ),
         ),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const Center(
+          child: ThemePulsingDotsIndicator(
+            size: 12.0,
+            spacing: 16.0,
+          ),
+        ),
       );
     }
 
@@ -188,26 +194,38 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                   ),
                 ],
               )
-            : ListView(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: MediaQuery.of(context).padding.bottom + 100,
-          ),
-          children: [
-          if (_selected != null) ...[
-            _Banner(
-              selected: _selected!,
-              onChangeCourse: () => _showCourseSelectionDialog(context, joined),
+            : AppAnimations.fadeSlideIn(
+              delay: 100,
+              child: ListView(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 16,
+                  bottom: MediaQuery.of(context).padding.bottom + 100,
+                ),
+                children: [
+                  if (_selected != null) ...[
+                    AppAnimations.scaleIn(
+                      delay: 150,
+                      child: _Banner(
+                        selected: _selected!,
+                        onChangeCourse: () => _showCourseSelectionDialog(context, joined),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    AppAnimations.fadeSlideIn(
+                      delay: 200,
+                      child: _subjectSection(context),
+                    ),
+                    const SizedBox(height: 24),
+                    AppAnimations.fadeSlideIn(
+                      delay: 250,
+                      child: _contactSection(context),
+                    ),
+                  ],
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            _subjectSection(context),
-            const SizedBox(height: 24),
-            _contactSection(context),
-          ],
-        ],
-      ),
       ),
     );
   }
@@ -389,69 +407,260 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
     }).toList();
   }
 
-  Widget _contactSection(BuildContext context) => Card(
-    elevation: 8,
-    shadowColor: Colors.black.withOpacity(0.15),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-      side: const BorderSide(color: Color(0xFF582DB0), width: 2),
-    ),
-    child: Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'CONTACT',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                fontSize: 22,
-                letterSpacing: 0.5,
+  Widget _contactSection(BuildContext context) {
+    final selectedCourse = _selected;
+    if (selectedCourse == null) {
+      return const SizedBox.shrink();
+    }
+
+    return FutureBuilder(
+      future: ContactService.getContactInfo(),
+      builder: (context, snapshot) {
+        final contactInfo = snapshot.data ?? ContactInfo.getDefault();
+        final whatsappNum = _resolveCourseWhatsAppNumber(selectedCourse, contactInfo);
+        final displayNumber = _formatWhatsAppDisplay(whatsappNum);
+        final supportLabel = _resolveCourseSupportLabel(selectedCourse);
+        final isLoading = snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData;
+
+        return SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: isLoading
+                ? null
+                : () async {
+                    if (!context.mounted) return;
+                    await _showContactDialog(
+                      context,
+                      whatsappNum: whatsappNum,
+                      displayNumber: displayNumber,
+                      supportLabel: supportLabel,
+                    );
+                  },
+            icon: const Icon(Icons.headset_mic, size: 20),
+            label: Text(
+              isLoading ? 'Contacting...' : supportLabel,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              side: const BorderSide(color: Color(0xFF582DB0), width: 2),
+              foregroundColor: const Color(0xFF582DB0),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  final whatsappNum = '+91 9207666621'.replaceAll(RegExp(r'[^0-9]'), ''); // +91 92076 66621
-                  // Ensure it starts with 91
-                  final cleanedNum = whatsappNum.startsWith('91') ? whatsappNum : '91$whatsappNum';
-                  final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
-                  final uri = Uri.parse('https://wa.me/$cleanedNum?text=$message');
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white.withOpacity(0.2),
-                  foregroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xFFA1C95C), width: 1),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showContactDialog(
+    BuildContext context, {
+    required String whatsappNum,
+    required String displayNumber,
+    required String supportLabel,
+  }) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: const Color(0xFF582DB0),
+                  width: 2,
+                ),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFFF5F0FF),
+                    Color(0xFFFFFFFF),
+                  ],
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x33582DB0),
+                    blurRadius: 24,
+                    offset: Offset(0, 12),
                   ),
-                ),
-                icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 20, color: Colors.white),
-                label: const Text(
-                  'WhatsApp Support',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 48,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFBFA5ED),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFF4D23AA),
+                                Color(0xFF6435C8),
+                              ],
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x40582DB0),
+                                blurRadius: 20,
+                                offset: Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.headset_mic,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                supportLabel,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF582DB0),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Reach us on WhatsApp at $displayNumber',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  height: 1.5,
+                                  color: Color(0xFF4C3B82),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Color(0xFF582DB0)),
+                          tooltip: 'Close',
+                          onPressed: () => Navigator.of(sheetContext).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 28),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF25D366),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 4,
+                        ),
+                        icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 20),
+                        label: const Text(
+                          'WhatsApp',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
+                        onPressed: () async {
+                          final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
+                          final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
+                          Navigator.of(sheetContext).pop();
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFFE0D2FF),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEEE4FF),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.info_outline,
+                              color: Color(0xFF582DB0),
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  supportLabel,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF452D8A),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Available Mon - Sat · 9:00 AM to 6:00 PM',
+                                  style: TextStyle(
+                                    color: Color(0xFF5B4A9B),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    ),
-  );
+          ),
+        );
+      },
+    );
+  }
 
   void _showCourseSelectionDialog(BuildContext context, List<JoinedCourse> courses) {
     showDialog(
@@ -603,6 +812,61 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
       return course.chapters;
     }
     return const [];
+  }
+
+  String _resolveCourseWhatsAppNumber(JoinedCourse course, ContactInfo contactInfo) {
+    final title = course.title.toLowerCase();
+    if (title.contains('nios')) {
+      return '919207666621';
+    }
+    if (title.contains('bosse')) {
+      return '919207666623';
+    }
+    if (title.contains('gmvss') || title.contains('gmv')) {
+      return '919207666628';
+    }
+    final fallback = contactInfo.whatsappNumber ??
+        contactInfo.phone ??
+        '+91 92076 666621';
+    return _sanitizeWhatsappDigits(fallback);
+  }
+
+  String _sanitizeWhatsappDigits(String number) {
+    final digits = number.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return '919207666621';
+    if (digits.startsWith('91')) return digits;
+    return '91$digits';
+  }
+
+  String _formatWhatsAppDisplay(String digits) {
+    final cleaned = digits.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleaned.startsWith('91') && cleaned.length > 2) {
+      final local = cleaned.substring(2);
+      if (local.length > 5) {
+        final first = local.substring(0, 5);
+        final second = local.substring(5);
+        return '+91 $first $second';
+      }
+      return '+91 $local';
+    }
+    if (cleaned.isNotEmpty) {
+      return '+$cleaned';
+    }
+    return '+91 92076 66621';
+  }
+
+  String _resolveCourseSupportLabel(JoinedCourse course) {
+    final title = course.title.toLowerCase();
+    if (title.contains('nios')) {
+      return 'NIOS Support';
+    }
+    if (title.contains('bosse')) {
+      return 'BOSSE Support';
+    }
+    if (title.contains('gmvss') || title.contains('gmv')) {
+      return 'GMVSS Support';
+    }
+    return 'Course Support';
   }
 }
 

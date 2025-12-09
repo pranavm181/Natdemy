@@ -160,6 +160,8 @@ class CourseDetailPage extends StatelessWidget {
                             fontSize: 24,
                             fontStyle: FontStyle.italic,
                           ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 12),
                         RatingStars(

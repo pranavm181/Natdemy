@@ -10,6 +10,13 @@ class Responsive {
   // Max content width for web
   static const double maxContentWidth = 1400;
 
+  // iPhone screen width breakpoints
+  // iPhone SE (1st/2nd gen): 320px
+  // iPhone 6/7/8, X/11/12/13 mini: 375px
+  // iPhone 6/7/8 Plus, XR: 414px
+  // iPhone X/11/12/13/14: 390px
+  // iPhone 14/15 Pro Max: 430px
+
   // Get responsive padding
   static EdgeInsets getPadding(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
@@ -24,15 +31,15 @@ class Responsive {
       }
     }
     
-    // Android: Adapt based on screen width
+    // Mobile (iOS iPhone & Android): Adapt based on screen width
     if (width < 360) {
-      // Small phones (e.g., 320px - 360px)
+      // Small phones (iPhone SE: 320px)
       return const EdgeInsets.symmetric(horizontal: 12);
     } else if (width < 600) {
-      // Regular phones (360px - 600px)
+      // Regular phones (iPhone 6/7/8: 375px, iPhone Plus: 414px, iPhone X/11/12/13: 390px, iPhone Pro Max: 430px)
       return const EdgeInsets.symmetric(horizontal: 16);
     } else {
-      // Tablets and large phones (600px+)
+      // Tablets and large phones (iPad, Android tablets)
       return const EdgeInsets.symmetric(horizontal: 24);
     }
   }
@@ -51,15 +58,15 @@ class Responsive {
       }
     }
     
-    // Android: Adapt based on screen width
+    // Mobile (iOS iPhone & Android): Adapt based on screen width
     if (width < 360) {
-      // Small phones
+      // Small phones (iPhone SE: 320px)
       return 12;
     } else if (width < 600) {
-      // Regular phones
+      // Regular phones (iPhone 6/7/8: 375px, iPhone Plus: 414px, iPhone X/11/12/13: 390px, iPhone Pro Max: 430px)
       return 16;
     } else {
-      // Tablets and large phones
+      // Tablets and large phones (iPad, Android tablets)
       return 24;
     }
   }
@@ -78,15 +85,15 @@ class Responsive {
       }
     }
     
-    // Android: Adapt based on screen width
+    // Mobile (iOS iPhone & Android): Adapt based on screen width
     if (width < 360) {
-      // Small phones: 1 column
+      // Small phones (iPhone SE: 320px) - 1 column for better readability
       return 1;
     } else if (width < 600) {
-      // Regular phones: 2 columns
+      // Regular phones (iPhone 6/7/8: 375px, iPhone Plus: 414px, iPhone X/11/12/13: 390px, iPhone Pro Max: 430px) - 2 columns
       return 2;
     } else {
-      // Tablets and large phones: 3 columns
+      // Tablets and large phones (iPad, Android tablets) - 3 columns
       return 3;
     }
   }
@@ -105,15 +112,15 @@ class Responsive {
       }
     }
     
-    // Android: Adapt based on screen width
+    // Mobile (iOS iPhone & Android): Adapt based on screen width
     if (width < 360) {
-      // Small phones
+      // Small phones (iPhone SE: 320px)
       return 8;
     } else if (width < 600) {
-      // Regular phones
+      // Regular phones (iPhone 6/7/8: 375px, iPhone Plus: 414px, iPhone X/11/12/13: 390px, iPhone Pro Max: 430px)
       return 12;
     } else {
-      // Tablets and large phones
+      // Tablets and large phones (iPad, Android tablets)
       return 16;
     }
   }
@@ -134,17 +141,6 @@ class Responsive {
     return MediaQuery.of(context).size.width >= tabletBreakpoint;
   }
 
-  // Get responsive font size
-  static double getFontSize(BuildContext context, {required double mobile, required double tablet, required double desktop}) {
-    if (isMobile(context)) {
-      return mobile;
-    } else if (isTablet(context)) {
-      return tablet;
-    } else {
-      return desktop;
-    }
-  }
-
   // Constrain content width for web
   static Widget constrainWidth(Widget child, {double? maxWidth}) {
     if (!kIsWeb) {
@@ -159,6 +155,64 @@ class Responsive {
         child: child,
       ),
     );
+  }
+
+  // Get safe area padding for iOS (handles notch, status bar, etc.)
+  static EdgeInsets getSafeAreaPadding(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    return EdgeInsets.only(
+      top: mediaQuery.padding.top,
+      bottom: mediaQuery.padding.bottom,
+      left: mediaQuery.padding.left,
+      right: mediaQuery.padding.right,
+    );
+  }
+
+  // Get bottom safe area padding (for iPhone X and newer with home indicator)
+  static double getBottomSafeArea(BuildContext context) {
+    return MediaQuery.of(context).padding.bottom;
+  }
+
+  // Get top safe area padding (for iPhone X and newer with notch)
+  static double getTopSafeArea(BuildContext context) {
+    return MediaQuery.of(context).padding.top;
+  }
+
+  // Check if device has notch (iPhone X and newer)
+  static bool hasNotch(BuildContext context) {
+    return MediaQuery.of(context).padding.top > 20;
+  }
+
+  // Get responsive font size with iPhone-specific considerations
+  static double getFontSize(BuildContext context, {
+    required double mobile,
+    required double tablet,
+    required double desktop,
+    double? smallPhone, // For iPhone SE and similar small devices
+  }) {
+    final width = MediaQuery.of(context).size.width;
+    
+    if (kIsWeb) {
+      if (isDesktop(context)) {
+        return desktop;
+      } else if (isTablet(context)) {
+        return tablet;
+      } else {
+        return mobile;
+      }
+    }
+    
+    // Mobile devices
+    if (width < 360 && smallPhone != null) {
+      // Small phones (iPhone SE: 320px)
+      return smallPhone;
+    } else if (isMobile(context)) {
+      return mobile;
+    } else if (isTablet(context)) {
+      return tablet;
+    } else {
+      return desktop;
+    }
   }
 }
 

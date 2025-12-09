@@ -399,53 +399,105 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ],
       ) : pages[_currentIndex],
-      bottomNavigationBar: kIsWeb ? null : Container(
-        margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF582DB0),
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
+      bottomNavigationBar: kIsWeb ? null : Builder(
+        builder: (context) {
+          final width = MediaQuery.of(context).size.width;
+          final isSmallScreen = width < 360; // iPhone SE
+          final isMediumScreen = width >= 360 && width < 400; // iPhone 6/7/8, X/11/12/13
+          
+          // Responsive values - bigger content with better edge spacing
+          final horizontalMargin = isSmallScreen ? 16.0 : 20.0; // Increased from screen edges
+          final bottomMargin = isSmallScreen ? 10.0 : 12.0; // Better bottom spacing
+          final borderRadius = isSmallScreen ? 18.0 : 20.0;
+          final containerPaddingH = isSmallScreen ? 10.0 : 14.0; // Better internal spacing
+          final containerPaddingV = isSmallScreen ? 6.0 : 8.0; // Better vertical spacing
+          final navPaddingH = isSmallScreen ? 10.0 : 14.0;
+          final navPaddingV = isSmallScreen ? 10.0 : 12.0;
+          final gap = isSmallScreen ? 6.0 : 8.0;
+          final iconSize = isSmallScreen ? 24.0 : 26.0; // Bigger icons
+          final textSize = isSmallScreen ? 13.0 : 14.0; // Bigger text
+          
+          return Container(
+            margin: EdgeInsets.only(
+              left: horizontalMargin,
+              right: horizontalMargin,
+              bottom: bottomMargin,
             ),
-          ],
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-            child: GNav(
-              backgroundColor: Colors.transparent,
-              color: Colors.white,
-              activeColor: const Color(0xFFA1C95C),
-              tabBackgroundColor: const Color(0xFFA1C95C).withOpacity(0.2),
-              gap: 8,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              curve: Curves.easeInOut,
-              tabs: const [
-                GButton(
-                  icon: Icons.home_outlined,
-                  text: 'Home',
-                ),
-                GButton(
-                  icon: Icons.menu_book_outlined,
-                  text: 'My Courses',
-                ),
-                GButton(
-                  icon: Icons.person_outline,
-                  text: 'Profile',
+            decoration: BoxDecoration(
+              color: const Color(0xFF582DB0),
+              borderRadius: BorderRadius.circular(borderRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
                 ),
               ],
-              selectedIndex: _currentIndex,
-              onTabChange: (index) {
-                // Just change the tab - let MyCoursesScreen handle its own loading
-                setState(() => _currentIndex = index);
-              },
             ),
-          ),
-        ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: containerPaddingH,
+                  right: containerPaddingH,
+                  top: containerPaddingV,
+                  bottom: containerPaddingV * 0.5, // Smaller bottom padding
+                ),
+                child: GNav(
+                  backgroundColor: Colors.transparent,
+                  color: Colors.white, // White for unselected text and icons
+                  activeColor: const Color(0xFFA1C95C), // Green for selected text and icons
+                  tabBackgroundColor: const Color(0xFFA1C95C).withOpacity(0.2),
+                  gap: gap,
+                  padding: EdgeInsets.only(
+                    left: navPaddingH,
+                    right: navPaddingH,
+                    top: navPaddingV,
+                    bottom: navPaddingV * 0.6, // Smaller bottom padding
+                  ),
+                  curve: Curves.easeInOut,
+                  tabs: [
+                    GButton(
+                      icon: Icons.home_outlined,
+                      text: 'Home',
+                      iconSize: iconSize,
+                      textStyle: TextStyle(
+                        fontSize: textSize,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white, // Unselected text color
+                      ),
+                    ),
+                    GButton(
+                      icon: Icons.menu_book_outlined,
+                      text: 'My Courses',
+                      iconSize: iconSize,
+                      textStyle: TextStyle(
+                        fontSize: textSize,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white, // Unselected text color
+                      ),
+                    ),
+                    GButton(
+                      icon: Icons.person_outline,
+                      text: 'Profile',
+                      iconSize: iconSize,
+                      textStyle: TextStyle(
+                        fontSize: textSize,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white, // Unselected text color
+                      ),
+                    ),
+                  ],
+                  selectedIndex: _currentIndex,
+                  onTabChange: (index) {
+                    // Just change the tab - let MyCoursesScreen handle its own loading
+                    setState(() => _currentIndex = index);
+                  },
+                ),
+              ),
+            ),
+          );
+        },
       ),
       extendBody: !kIsWeb,
     );

@@ -92,9 +92,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(32),
+                      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 20 : 32),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           AppAnimations.fadeIn(
                             delay: 150,
@@ -180,11 +181,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              "Don't have an account? ",
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: const Color(0xFF64748B),
-                                  ),
+                            Flexible(
+                              child: Text(
+                                "Don't have an account? ",
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: const Color(0xFF64748B),
+                                    ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                             TextButton(
                               onPressed: () {

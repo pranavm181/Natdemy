@@ -77,14 +77,14 @@ class ClassesScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(
-                    width: 140,
+                    width: MediaQuery.of(context).size.width < 360 ? 100 : 140,
                     height: 90,
                     child: Ink.image(
                       image: NetworkImage(item.thumbnailUrl),
                       fit: BoxFit.cover,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: MediaQuery.of(context).size.width < 360 ? 8 : 12),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),

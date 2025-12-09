@@ -587,6 +587,10 @@ class _HomeTabState extends State<HomeTab> {
   bool _isLoadingBanners = true;
   late final PageController _testimonialPageController;
   int _currentTestimonialIndex = 0;
+  static const int _bannerPageChunk = 3;
+  static const int _testimonialPageChunk = 3;
+  int _visibleBannerCount = 0;
+  int _visibleTestimonialCount = 0;
 
   double _calculateTestimonialTextWidth(double cardWidth) {
     final double padding = kIsWeb ? 16 : 12;
@@ -640,6 +644,80 @@ class _HomeTabState extends State<HomeTab> {
     return totalHeight.clamp(minHeight, maxHeight);
   }
 
+  List<AppBanner> get _displayedBanners {
+    if (_banners.isEmpty || _visibleBannerCount <= 0 || _visibleBannerCount >= _banners.length) {
+      return _banners;
+    }
+    return _banners.take(_visibleBannerCount).toList();
+  }
+
+  List<Testimonial> get _displayedTestimonials {
+    if (_testimonials.isEmpty ||
+        _visibleTestimonialCount <= 0 ||
+        _visibleTestimonialCount >= _testimonials.length) {
+      return _testimonials;
+    }
+    return _testimonials.take(_visibleTestimonialCount).toList();
+  }
+
+  void _resetBannerPagination() {
+    _visibleBannerCount = _banners.isEmpty ? 0 : math.min(_bannerPageChunk, _banners.length);
+  }
+
+  void _resetTestimonialPagination() {
+    _visibleTestimonialCount =
+        _testimonials.isEmpty ? 0 : math.min(_testimonialPageChunk, _testimonials.length);
+    _currentTestimonialIndex = 0;
+    if (_testimonialPageController.hasClients && _visibleTestimonialCount > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_testimonialPageController.hasClients) {
+          _testimonialPageController.jumpToPage(0);
+        }
+      });
+    }
+  }
+
+  void _loadMoreBannersChunk() {
+    if (_banners.isEmpty) return;
+    if (_visibleBannerCount >= _banners.length) return;
+    setState(() {
+      _visibleBannerCount =
+          math.min(_visibleBannerCount + _bannerPageChunk, _banners.length);
+    });
+  }
+
+  void _loadMoreTestimonialsChunk() {
+    if (_testimonials.isEmpty) return;
+    if (_visibleTestimonialCount >= _testimonials.length) return;
+    setState(() {
+      _visibleTestimonialCount = math.min(
+        _visibleTestimonialCount + _testimonialPageChunk,
+        _testimonials.length,
+      );
+    });
+  }
+
+  void _handleBannerPageChanged(int index) {
+    if (_visibleBannerCount < _banners.length) {
+      final threshold = math.max(0, _visibleBannerCount - 2);
+      if (index >= threshold) {
+        _loadMoreBannersChunk();
+      }
+    }
+  }
+
+  void _handleTestimonialPageChanged(int index) {
+    setState(() {
+      _currentTestimonialIndex = index;
+    });
+    if (_visibleTestimonialCount < _testimonials.length) {
+      final threshold = math.max(0, _visibleTestimonialCount - 2);
+      if (index >= threshold) {
+        _loadMoreTestimonialsChunk();
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -679,6 +757,7 @@ class _HomeTabState extends State<HomeTab> {
         setState(() {
           _testimonials = testimonials;
           _isLoadingTestimonials = false;
+          _resetTestimonialPagination();
         });
       }
       
@@ -687,6 +766,7 @@ class _HomeTabState extends State<HomeTab> {
         if (mounted) {
           setState(() {
             _testimonials = updatedTestimonials;
+            _resetTestimonialPagination();
           });
         }
       }).catchError((e) {
@@ -713,6 +793,7 @@ class _HomeTabState extends State<HomeTab> {
         setState(() {
           _banners = banners;
           _isLoadingBanners = false;
+          _resetBannerPagination();
         });
       }
     } catch (e, stackTrace) {
@@ -1231,12 +1312,19 @@ class _HomeTabState extends State<HomeTab> {
                   kIsWeb ? Responsive.getHorizontalPadding(context) : 16,
                   kIsWeb ? 32 : 16,
                 ),
-                child: (_isLoadingBanners || _banners.isEmpty)
-                    ? _buildBannerPlaceholder(context)
-                    : BannerCarousel(
-                        banners: _banners,
-                        student: widget.student,
-                      ),
+                child: Builder(
+                  builder: (context) {
+                    final bannerList = _displayedBanners;
+                    if (_isLoadingBanners || bannerList.isEmpty) {
+                      return _buildBannerPlaceholder(context);
+                    }
+                    return BannerCarousel(
+                      banners: bannerList,
+                      student: widget.student,
+                      onPageChanged: _handleBannerPageChanged,
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -1964,11 +2052,15 @@ class _HomeTabState extends State<HomeTab> {
                             ),
                             child: LayoutBuilder(
                               builder: (context, constraints) {
+                                final testimonialsToShow = _displayedTestimonials;
+                                if (testimonialsToShow.isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
                                 final double cardWidth = constraints.maxWidth;
                                 final int safeIndex = _currentTestimonialIndex
-                                    .clamp(0, _testimonials.length - 1)
+                                    .clamp(0, testimonialsToShow.length - 1)
                                     .toInt();
-                                final Testimonial activeTestimonial = _testimonials[safeIndex];
+                                final Testimonial activeTestimonial = testimonialsToShow[safeIndex];
                                 final double cardHeight = _calculateTestimonialCardHeight(
                                   cardWidth,
                                   activeTestimonial,
@@ -1984,172 +2076,168 @@ class _HomeTabState extends State<HomeTab> {
                                         height: cardHeight,
                                         child: PageView.builder(
                                           controller: _testimonialPageController,
-                                          itemCount: _testimonials.length,
-                                          onPageChanged: (index) {
-                                            setState(() {
-                                              _currentTestimonialIndex = index;
-                                            });
-                                          },
+                                          itemCount: testimonialsToShow.length,
+                                          onPageChanged: _handleTestimonialPageChanged,
                                           itemBuilder: (context, index) {
-                                            final testimonial = _testimonials[index];
+                                            final testimonial = testimonialsToShow[index];
                                             return Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                                              child: AnimatedListItem(
-                                                index: index,
-                                                child: MouseRegion(
-                                                  cursor: kIsWeb ? SystemMouseCursors.click : MouseCursor.defer,
-                                                  child: AnimatedContainer(
-                                                    duration: const Duration(milliseconds: 200),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.white,
-                                                      borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
-                                                      boxShadow: [
-                                                        BoxShadow(
-                                                          color: Colors.black.withOpacity(kIsWeb ? 0.08 : 0.05),
-                                                          blurRadius: kIsWeb ? 16 : 10,
-                                                          spreadRadius: kIsWeb ? 1 : 0,
-                                                          offset: const Offset(0, 4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                                        child: AnimatedListItem(
+                                          index: index,
+                                          child: MouseRegion(
+                                            cursor: kIsWeb ? SystemMouseCursors.click : MouseCursor.defer,
+                                            child: AnimatedContainer(
+                                              duration: const Duration(milliseconds: 200),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                  borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black.withOpacity(kIsWeb ? 0.08 : 0.05),
+                                                    blurRadius: kIsWeb ? 16 : 10,
+                                                    spreadRadius: kIsWeb ? 1 : 0,
+                                                    offset: const Offset(0, 4),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Padding(
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: kIsWeb ? 16 : 12,
+                                                  vertical: kIsWeb ? 14 : 10,
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        CircleAvatar(
+                                                          radius: kIsWeb ? 18 : 16,
+                                                          backgroundColor: const Color(0xFF582DB0),
+                                                          backgroundImage: testimonial.imageUrl != null &&
+                                                                  testimonial.imageUrl!.isNotEmpty
+                                                              ? NetworkImage(testimonial.imageUrl!)
+                                                              : null,
+                                                          child: testimonial.imageUrl == null ||
+                                                                  testimonial.imageUrl!.isEmpty
+                                                              ? Text(
+                                                                  testimonial.name.isNotEmpty
+                                                                      ? testimonial.name[0].toUpperCase()
+                                                                      : '?',
+                                                                  style: TextStyle(
+                                                                    color: Colors.white,
+                                                                    fontSize: kIsWeb ? 16 : 14,
+                                                                    fontWeight: FontWeight.bold,
+                                                                  ),
+                                                                )
+                                                              : null,
+                                                        ),
+                                                        const SizedBox(width: 10),
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              Text(
+                                                                testimonial.name,
+                                                                style: TextStyle(
+                                                                  fontSize: kIsWeb ? 15 : 13,
+                                                                  fontWeight: FontWeight.w700,
+                                                                  color: const Color(0xFF1E293B),
+                                                                ),
+                                                                maxLines: 1,
+                                                                overflow: TextOverflow.ellipsis,
+                                                              ),
+                                                              if (testimonial.department != null &&
+                                                                  testimonial.department!.isNotEmpty)
+                                                                Text(
+                                                                  testimonial.department!,
+                                                                  style: TextStyle(
+                                                                    color: Colors.grey[600],
+                                                                    fontSize: kIsWeb ? 12 : 11,
+                                                                  ),
+                                                                  maxLines: 1,
+                                                                  overflow: TextOverflow.ellipsis,
+                                                                ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 6),
+                                                        SizedBox(
+                                                                width: kIsWeb ? 80 : 68,
+                                                          child: RatingStars(
+                                                            rating: testimonial.rating.toDouble(),
+                                                            starSize: kIsWeb ? 14 : 12,
+                                                            showValue: false,
+                                                            mainAxisAlignment: MainAxisAlignment.end,
+                                                          ),
                                                         ),
                                                       ],
                                                     ),
-                                                    child: Padding(
-                                                      padding: EdgeInsets.symmetric(
-                                                        horizontal: kIsWeb ? 16 : 12,
-                                                        vertical: kIsWeb ? 14 : 10,
-                                                      ),
-                                                      child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          Row(
-                                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                                            children: [
-                                                              CircleAvatar(
-                                                                radius: kIsWeb ? 18 : 16,
-                                                                backgroundColor: const Color(0xFF582DB0),
-                                                                backgroundImage: testimonial.imageUrl != null &&
-                                                                        testimonial.imageUrl!.isNotEmpty
-                                                                    ? NetworkImage(testimonial.imageUrl!)
-                                                                    : null,
-                                                                child: testimonial.imageUrl == null ||
-                                                                        testimonial.imageUrl!.isEmpty
-                                                                    ? Text(
-                                                                        testimonial.name.isNotEmpty
-                                                                            ? testimonial.name[0].toUpperCase()
-                                                                            : '?',
-                                                                        style: TextStyle(
-                                                                          color: Colors.white,
-                                                                          fontSize: kIsWeb ? 16 : 14,
-                                                                          fontWeight: FontWeight.bold,
-                                                                        ),
-                                                                      )
-                                                                    : null,
-                                                              ),
-                                                              const SizedBox(width: 10),
-                                                              Expanded(
-                                                                child: Column(
-                                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                                  children: [
-                                                                    Text(
-                                                                      testimonial.name,
-                                                                      style: TextStyle(
-                                                                        fontSize: kIsWeb ? 15 : 13,
-                                                                        fontWeight: FontWeight.w700,
-                                                                        color: const Color(0xFF1E293B),
-                                                                      ),
-                                                                      maxLines: 1,
-                                                                      overflow: TextOverflow.ellipsis,
-                                                                    ),
-                                                                    if (testimonial.department != null &&
-                                                                        testimonial.department!.isNotEmpty)
-                                                                      Text(
-                                                                        testimonial.department!,
-                                                                        style: TextStyle(
-                                                                          color: Colors.grey[600],
-                                                                          fontSize: kIsWeb ? 12 : 11,
-                                                                        ),
-                                                                        maxLines: 1,
-                                                                        overflow: TextOverflow.ellipsis,
-                                                                      ),
-                                                                  ],
-                                                                ),
-                                                              ),
-                                                              const SizedBox(width: 6),
-                                                              SizedBox(
-                                                                width: kIsWeb ? 80 : 68,
-                                                                child: RatingStars(
-                                                                  rating: testimonial.rating.toDouble(),
-                                                                  starSize: kIsWeb ? 14 : 12,
-                                                                  showValue: false,
-                                                                  mainAxisAlignment: MainAxisAlignment.end,
-                                                                ),
-                                                              ),
-                                                            ],
+                                                    const SizedBox(height: 16),
+                                                    Row(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Container(
+                                                          padding: EdgeInsets.all(kIsWeb ? 8 : 6),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFF582DB0).withOpacity(0.1),
+                                                            borderRadius:
+                                                                BorderRadius.circular(kIsWeb ? 12 : 10),
                                                           ),
-                                                          const SizedBox(height: 16),
-                                                          Row(
-                                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                                            children: [
-                                                              Container(
-                                                                padding: EdgeInsets.all(kIsWeb ? 8 : 6),
-                                                                decoration: BoxDecoration(
-                                                                  color: const Color(0xFF582DB0).withOpacity(0.1),
-                                                                  borderRadius:
-                                                                      BorderRadius.circular(kIsWeb ? 12 : 10),
-                                                                ),
-                                                                child: Icon(
-                                                                  Icons.format_quote,
-                                                                  color: const Color(0xFF582DB0),
-                                                                  size: kIsWeb ? 24 : 20,
-                                                                ),
-                                                              ),
-                                                              SizedBox(width: kIsWeb ? 12 : 10),
-                                                              Expanded(
-                                                                child: Text(
+                                                          child: Icon(
+                                                            Icons.format_quote,
+                                                            color: const Color(0xFF582DB0),
+                                                            size: kIsWeb ? 24 : 20,
+                                                          ),
+                                                        ),
+                                                        SizedBox(width: kIsWeb ? 12 : 10),
+                                                        Expanded(
+                                                          child: Text(
                                                                   testimonial.content.trim(),
-                                                                  style: TextStyle(
-                                                                    fontSize: kIsWeb ? 14.5 : 12.5,
-                                                                    color: Colors.grey[800],
-                                                                    height: 1.45,
-                                                                    fontWeight: FontWeight.w400,
-                                                                    letterSpacing: 0.2,
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              SizedBox(width: kIsWeb ? 12 : 10),
-                                                              Container(
-                                                                padding: EdgeInsets.all(kIsWeb ? 8 : 6),
-                                                                decoration: BoxDecoration(
-                                                                  color: const Color(0xFF582DB0).withOpacity(0.1),
-                                                                  borderRadius:
-                                                                      BorderRadius.circular(kIsWeb ? 12 : 10),
-                                                                ),
-                                                                child: Transform.rotate(
-                                                                  angle: math.pi,
-                                                                  child: Icon(
-                                                                    Icons.format_quote,
-                                                                    color: const Color(0xFF582DB0),
-                                                                    size: kIsWeb ? 24 : 20,
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                            ],
+                                                            style: TextStyle(
+                                                              fontSize: kIsWeb ? 14.5 : 12.5,
+                                                              color: Colors.grey[800],
+                                                              height: 1.45,
+                                                              fontWeight: FontWeight.w400,
+                                                              letterSpacing: 0.2,
+                                                            ),
                                                           ),
+                                                        ),
+                                                        SizedBox(width: kIsWeb ? 12 : 10),
+                                                        Container(
+                                                          padding: EdgeInsets.all(kIsWeb ? 8 : 6),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFF582DB0).withOpacity(0.1),
+                                                            borderRadius:
+                                                                BorderRadius.circular(kIsWeb ? 12 : 10),
+                                                          ),
+                                                          child: Transform.rotate(
+                                                                  angle: math.pi,
+                                                            child: Icon(
+                                                              Icons.format_quote,
+                                                              color: const Color(0xFF582DB0),
+                                                              size: kIsWeb ? 24 : 20,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
                                                           SizedBox(height: kIsWeb ? 22 : 18),
                                                         ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
                                               ),
-                                            );
-                                          },
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
                                     const SizedBox(height: 16),
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
-                                      children: List.generate(_testimonials.length, (index) {
+                                      children: List.generate(testimonialsToShow.length, (index) {
                                         final isActive = index == _currentTestimonialIndex;
                                         return AnimatedContainer(
                                           duration: const Duration(milliseconds: 200),

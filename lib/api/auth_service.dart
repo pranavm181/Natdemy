@@ -6,6 +6,7 @@ import 'package:http_parser/http_parser.dart';
 import '../data/student.dart';
 import 'api_client.dart';
 import 'course_service.dart';
+import '../utils/json_parser.dart';
 
 class AuthException implements Exception {
   AuthException(this.message, {this.statusCode});
@@ -143,7 +144,8 @@ class AuthService {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       debugPrint('   ✅ SUCCESS: Student data saved to database');
       try {
-        final responseData = json.decode(response.body);
+        // Parse JSON in background thread (small response, but good practice)
+        final responseData = await JsonParser.parseJson(response.body);
         debugPrint('   Response Data: $responseData');
         if (responseData is Map<String, dynamic>) {
           if (responseData.containsKey('id') || responseData.containsKey('student')) {

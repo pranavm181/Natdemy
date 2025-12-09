@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../data/banner.dart' show AppBanner;
 import 'api_client.dart';
+import '../utils/json_parser.dart';
 
 class BannerService {
   // Fetch banners from home API
@@ -25,7 +26,8 @@ class BannerService {
       
       if (response.statusCode == 200) {
         try {
-          final Map<String, dynamic> data = json.decode(response.body);
+          // Parse JSON in background thread to avoid blocking UI
+          final Map<String, dynamic> data = await JsonParser.parseJson(response.body);
           debugPrint('✅ JSON decoded successfully');
           
           if (data.containsKey('data') && data['data'] is Map) {

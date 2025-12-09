@@ -632,15 +632,9 @@ class JoinedCourses {
                   // Determine if course should be locked based on verified field
                   final isEnrolled = studentVerified == true;
                   
-                  // Skip fetching chapters if enrollment already exists (chapters should be in enrollment)
+                  // Skip fetching chapters - load them on-demand for better performance
+                  // Chapters will be loaded when user navigates to course detail
                   List<CourseChapter> chapters = [];
-                  if (!hasEnrollment) {
-                    try {
-                      chapters = await _fetchChaptersForCourseStream(selectedCourse.id!, selectedStream.id);
-                    } catch (e) {
-                      // Continue without chapters - they'll be empty
-                    }
-                  }
                   
                   // Create course entry (locked or unlocked based on verified status)
                   final studentCourse = JoinedCourse(
@@ -720,7 +714,51 @@ class JoinedCourses {
     }
   }
 
-  // Fetch chapters for a specific course and stream from the API
+  // Public method to fetch chapters for a specific course and stream (lazy loading)
+  Future<List<CourseChapter>> fetchChaptersForCourseStream(int courseId, int streamId) async {
+    return await _fetchChaptersForCourseStream(courseId, streamId);
+  }
+
+  // Update chapters for a specific course in the list
+  Future<void> loadChaptersForCourse(int courseId, int streamId) async {
+    try {
+      final chapters = await _fetchChaptersForCourseStream(courseId, streamId);
+      final index = _joined.indexWhere((c) => c.courseId == courseId && c.streamId == streamId);
+      if (index >= 0) {
+        final course = _joined[index];
+        _joined[index] = JoinedCourse(
+          courseId: course.courseId,
+          title: course.title,
+          color: course.color,
+          description: course.description,
+          rating: course.rating,
+          streamId: course.streamId,
+          streamName: course.streamName,
+          whatYoullLearn: course.whatYoullLearn,
+          thumbnailUrl: course.thumbnailUrl,
+          durationHours: course.durationHours,
+          duration: course.duration,
+          studentCount: course.studentCount,
+          price: course.price,
+          lessonsCount: course.lessonsCount,
+          chaptersCount: course.chaptersCount,
+          topics: course.topics,
+          progressPercentage: course.progressPercentage,
+          enrolledAt: course.enrolledAt,
+          lastAccessedAt: course.lastAccessedAt,
+          chapters: chapters,
+          isEnrolled: course.isEnrolled,
+        );
+        await _saveCourses();
+        debugPrint('✅ Loaded ${chapters.length} chapter(s) for course $courseId, stream $streamId');
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading chapters for course $courseId, stream $streamId: $e');
+      rethrow;
+    }
+  }
+
+  // Fetch chapters for a specific course and stream from the API (private)
   Future<List<CourseChapter>> _fetchChaptersForCourseStream(int courseId, int streamId) async {
     try {
       debugPrint('🔄 Fetching chapters for course $courseId, stream $streamId...');

@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../data/material.dart';
 import 'api_client.dart';
+import '../utils/json_parser.dart';
 
 class MaterialService {
   // Fetch materials from home API
@@ -25,7 +26,8 @@ class MaterialService {
       
       if (response.statusCode == 200) {
         try {
-          final Map<String, dynamic> data = json.decode(response.body);
+          // Parse JSON in background thread to avoid blocking UI
+          final Map<String, dynamic> data = await JsonParser.parseJson(response.body);
           
           if (data.containsKey('data') && data['data'] is Map) {
             final dataMap = data['data'] as Map<String, dynamic>;

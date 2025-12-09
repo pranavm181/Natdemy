@@ -51,6 +51,18 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     });
   }
 
+  void _showMoreOptionsLockedMessage() {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('More options are disabled for this video'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   Future<void> _toggleFullscreen() async {
     if (_webViewController == null) return;
     
@@ -136,15 +148,26 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     final CourseVideo? currentCourseVideo = apiVideos[selectedVideoIndex];
     final videoId = currentCourseVideo?.vimeoId ?? currentCourseVideo?.videoUrl ?? '';
 
+    // Get lesson materials from the lesson object
     final lessonMaterials = widget.lesson?.materials ?? const [];
     final hasMaterials = lessonMaterials.isNotEmpty;
     
     // Debug: Log materials count
+    debugPrint('🔍 Lesson Detail Debug:');
+    debugPrint('   Lesson: ${widget.lessonName}');
+    debugPrint('   Lesson object: ${widget.lesson != null ? "present" : "null"}');
+    if (widget.lesson != null) {
+      debugPrint('   Lesson videos count: ${widget.lesson!.videos.length}');
+      debugPrint('   Lesson materials count: ${widget.lesson!.materials.length}');
+    }
+    
     if (lessonMaterials.isNotEmpty) {
       debugPrint('📄 Lesson "${widget.lessonName}": Found ${lessonMaterials.length} material(s)');
       for (int i = 0; i < lessonMaterials.length; i++) {
         debugPrint('   Material ${i + 1}: ${lessonMaterials[i].name} (${lessonMaterials[i].url})');
       }
+    } else {
+      debugPrint('⚠️ Lesson "${widget.lessonName}": No materials found in lesson object');
     }
     
     // Get material for currently selected video
@@ -155,20 +178,36 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         ? (currentCourseVideo!.materialName ?? currentCourseVideo!.name)
         : null;
     
+    if (currentVideoMaterial != null && currentVideoMaterial.isNotEmpty) {
+      debugPrint('📎 Current video material: $currentVideoMaterialName ($currentVideoMaterial)');
+    }
+    
     // Collect MCQs from all videos in the lesson
     final lessonMcqs = <_McqItem>[];
     if (useApiVideos && widget.lesson != null) {
+      debugPrint('🔍 Checking ${widget.lesson!.videos.length} video(s) for MCQs...');
       for (final video in widget.lesson!.videos) {
         if (video.mcqUrl != null && video.mcqUrl!.isNotEmpty) {
+          debugPrint('   ✅ Found MCQ for video "${video.name}": ${video.mcqUrl}');
           lessonMcqs.add(_McqItem(
             title: video.name,
             url: video.mcqUrl!,
             videoName: video.name,
           ));
+        } else {
+          debugPrint('   ⚠️ Video "${video.name}": No MCQ URL');
         }
       }
+    } else {
+      debugPrint('⚠️ Cannot collect MCQs: useApiVideos=$useApiVideos, lesson=${widget.lesson != null}');
     }
     final hasMcqs = lessonMcqs.isNotEmpty;
+    
+    if (hasMcqs) {
+      debugPrint('📝 Found ${lessonMcqs.length} MCQ(s) total');
+    } else {
+      debugPrint('⚠️ No MCQs found for lesson "${widget.lessonName}"');
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -222,30 +261,108 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                             onInAppWebViewCreated: (controller) {
                               _webViewController = controller;
                               
-                              // Wait for video player to load before injecting scripts
-                              Future.delayed(const Duration(milliseconds: 2000), () {
-                                // Inject script to hide/disable ONLY the "Share" option
-                                controller.evaluateJavascript(source: '''
+                              // Inject script immediately and multiple times for better coverage
+                              // First injection - immediate
+                              controller.evaluateJavascript(source: '''
                                 (function() {
+                                  // Function to hide sign-in prompts and blocks
+                                  window.hideSignInPrompt = function() {
+                                    try {
+                                      // Hide sign-in related elements
+                                      var signInSelectors = [
+                                        '[class*="sign"][class*="in" i]',
+                                        '[class*="login" i]',
+                                        '[aria-label*="sign" i][aria-label*="in" i]',
+                                        '[aria-label*="log" i][aria-label*="in" i]',
+                                        '[title*="sign" i][title*="in" i]',
+                                        '[title*="log" i][title*="in" i]',
+                                        'button:contains("Sign in")',
+                                        'button:contains("Log in")',
+                                        'a:contains("Sign in")',
+                                        'a:contains("Log in")',
+                                        '[data-testid*="sign" i][data-testid*="in" i]',
+                                        '[data-testid*="login" i]'
+                                      ];
+                                      
+                                      signInSelectors.forEach(function(selector) {
+                                        try {
+                                          var elements = document.querySelectorAll(selector);
+                                          elements.forEach(function(el) {
+                                            var text = (el.textContent || '').toLowerCase();
+                                            var ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase();
+                                            var title = (el.getAttribute('title') || '').toLowerCase();
+                                            if (text.includes('sign') && text.includes('in') ||
+                                                text.includes('log') && text.includes('in') ||
+                                                ariaLabel.includes('sign') && ariaLabel.includes('in') ||
+                                                ariaLabel.includes('log') && ariaLabel.includes('in') ||
+                                                title.includes('sign') && title.includes('in') ||
+                                                title.includes('log') && title.includes('in')) {
+                                              el.style.cssText = 'display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;';
+                                              try {
+                                                if (el.parentNode) {
+                                                  el.parentNode.removeChild(el);
+                                                }
+                                              } catch (e) {}
+                                            }
+                                          });
+                                        } catch (e) {}
+                                      });
+                                      
+                                      // Find and hide all elements containing "sign in" or "log in" text
+                                      var allElements = document.querySelectorAll('*');
+                                      allElements.forEach(function(el) {
+                                        try {
+                                          var text = (el.textContent || '').toLowerCase().trim();
+                                          var ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase();
+                                          var title = (el.getAttribute('title') || '').toLowerCase();
+                                          
+                                          var isSignIn = (text.includes('sign') && text.includes('in')) ||
+                                                         (text.includes('log') && text.includes('in')) ||
+                                                         (ariaLabel.includes('sign') && ariaLabel.includes('in')) ||
+                                                         (ariaLabel.includes('log') && ariaLabel.includes('in')) ||
+                                                         (title.includes('sign') && title.includes('in')) ||
+                                                         (title.includes('log') && title.includes('in'));
+                                          
+                                          // Don't hide play buttons or video controls
+                                          var isVideoControl = text.includes('play') || 
+                                                               text.includes('pause') ||
+                                                               ariaLabel.includes('play') ||
+                                                               ariaLabel.includes('pause');
+                                          
+                                          if (isSignIn && !isVideoControl) {
+                                            el.style.cssText = 'display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;';
+                                            try {
+                                              if (el.parentNode) {
+                                                el.parentNode.removeChild(el);
+                                              }
+                                            } catch (e) {}
+                                          }
+                                        } catch (e) {}
+                                      });
+                                    } catch (e) {
+                                      console.log('Error hiding sign-in prompt: ' + e);
+                                    }
+                                  };
+                                  
                                   window.hideShareOption = function() {
                                     try {
-                                      // Only run if video player is loaded
-                                      var videoIframe = document.querySelector('iframe[src*="vimeo"], iframe[src*="player"]');
-                                      if (!videoIframe || !videoIframe.offsetParent) {
-                                        return;
-                                      }
-                                      
-                                      // Inject CSS to hide share options at CSS level
+                                      // Inject CSS to hide share options and more options button
                                       if (!document.getElementById('hide-share-css')) {
                                         var style = document.createElement('style');
                                         style.id = 'hide-share-css';
                                         style.textContent = `
                                           [aria-label*="Share" i],
                                           [title*="Share" i],
-                                          *:has-text("Share"),
-                                          button:has([aria-label*="Share" i]),
-                                          li:has-text("Share"),
-                                          [role="menuitem"]:has-text("Share") {
+                                          [aria-label*="More options" i],
+                                          [title*="More options" i],
+                                          button[aria-label*="More" i]:not([aria-label*="Play" i]):not([aria-label*="Pause" i]):not([aria-label*="Settings" i]):not([aria-label*="Quality" i]),
+                                          button[aria-label*="menu" i]:not([aria-label*="Play" i]):not([aria-label*="Pause" i]),
+                                          button[title*="More" i]:not([title*="Play" i]):not([title*="Pause" i]),
+                                          button[title*="menu" i]:not([title*="Play" i]):not([title*="Pause" i]),
+                                          [role="button"][aria-label*="More" i]:not([aria-label*="Play" i]):not([aria-label*="Pause" i]),
+                                          [role="button"][aria-label*="menu" i]:not([aria-label*="Play" i]):not([aria-label*="Pause" i]),
+                                          button:has(svg circle:nth-of-type(3)):not([aria-label*="Play" i]):not([aria-label*="Pause" i]):not([aria-label*="Settings" i]):not([aria-label*="Quality" i]),
+                                          button:has(svg path[d*="M"]:nth-of-type(3)):not([aria-label*="Play" i]):not([aria-label*="Pause" i]) {
                                             display: none !important;
                                             visibility: hidden !important;
                                             opacity: 0 !important;
@@ -259,44 +376,258 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                         (document.head || document.documentElement).appendChild(style);
                                       }
                                       
-                                      // Target ALL elements and check for "Share" text
-                                      var allElements = document.querySelectorAll('*');
-                                      allElements.forEach(function(el) {
-                                        try {
-                                          var ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase().trim();
-                                          var title = (el.getAttribute('title') || '').toLowerCase().trim();
-                                          var text = (el.textContent || '').trim().toLowerCase();
-                                          
-                                          // Check if it's the "Share" option - be very specific
-                                          var isShare = false;
-                                          
-                                          // Exact match
-                                          if (ariaLabel === 'share' || title === 'share' || text === 'share') {
-                                            isShare = true;
-                                          }
-                                          
-                                          // Text starts with "share" and is short (likely just "Share")
-                                          if (!isShare && text.startsWith('share') && text.length < 20) {
-                                            // Make sure it's not part of a longer word
-                                            var words = text.split(/[\s\n\r]+/);
-                                            if (words.some(function(word) { return word === 'share'; })) {
-                                              isShare = true;
+                                      // Add overlay div to block clicks on iframe's "More options" button area
+                                      function createBlockerOverlay() {
+                                        var existingBlocker = document.getElementById('vimeo-more-options-blocker');
+                                        if (existingBlocker) {
+                                          existingBlocker.remove();
+                                        }
+                                        
+                                        var blocker = document.createElement('div');
+                                        blocker.id = 'vimeo-more-options-blocker';
+                                        blocker.style.cssText = 'position: absolute; top: 0; right: 0; width: 80px; height: 60px; z-index: 999999; pointer-events: auto; background: transparent;';
+                                        
+                                        // Find the iframe container and add blocker
+                                        var iframe = document.querySelector('iframe[src*="vimeo"], iframe[src*="player"]');
+                                        if (iframe) {
+                                          // Try to add blocker to iframe's parent
+                                          if (iframe.parentElement) {
+                                            var parent = iframe.parentElement;
+                                            if (getComputedStyle(parent).position === 'static') {
+                                              parent.style.position = 'relative';
                                             }
+                                            parent.appendChild(blocker);
+                                          } else {
+                                            // Add blocker to body positioned over iframe
+                                            var rect = iframe.getBoundingClientRect();
+                                            blocker.style.position = 'fixed';
+                                            blocker.style.top = (rect.top + 8) + 'px';
+                                            blocker.style.right = (window.innerWidth - rect.right + 8) + 'px';
+                                            document.body.appendChild(blocker);
                                           }
-                                          
-                                          if (isShare) {
-                                            // Completely hide and remove
-                                            el.style.cssText = 'display: none !important; visibility: hidden !important; opacity: 0 !important; width: 0 !important; height: 0 !important; padding: 0 !important; margin: 0 !important; pointer-events: none !important; position: absolute !important; left: -9999px !important;';
-                                            
-                                            // Remove from DOM
+                                        } else {
+                                          // Try to find body or any container
+                                          var container = document.body || document.documentElement;
+                                          if (container) {
+                                            container.appendChild(blocker);
+                                          }
+                                        }
+                                        
+                                        // Block all pointer events on the blocker
+                                        blocker.addEventListener('click', function(e) {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          e.stopImmediatePropagation();
+                                          return false;
+                                        }, true);
+                                        
+                                        blocker.addEventListener('mousedown', function(e) {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          e.stopImmediatePropagation();
+                                          return false;
+                                        }, true);
+                                        
+                                        blocker.addEventListener('touchstart', function(e) {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          e.stopImmediatePropagation();
+                                          return false;
+                                        }, true);
+                                        
+                                        blocker.addEventListener('contextmenu', function(e) {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          e.stopImmediatePropagation();
+                                          return false;
+                                        }, true);
+                                      }
+                                      
+                                      createBlockerOverlay();
+                                      
+                                      // Try to access iframe content if possible
+                                      var videoIframe = document.querySelector('iframe[src*="vimeo"], iframe[src*="player"]');
+                                      var iframeDoc = null;
+                                      var iframeWindow = null;
+                                      try {
+                                        if (videoIframe) {
+                                          if (videoIframe.contentDocument) {
+                                            iframeDoc = videoIframe.contentDocument;
+                                            iframeWindow = videoIframe.contentWindow;
+                                          } else if (videoIframe.contentWindow) {
+                                            iframeWindow = videoIframe.contentWindow;
                                             try {
-                                              if (el.parentNode) {
-                                                el.parentNode.removeChild(el);
-                                              }
+                                              iframeDoc = iframeWindow.document;
                                             } catch (e) {}
                                           }
+                                          
+                                          // Try to inject script into iframe if accessible
+                                          if (iframeWindow && iframeWindow.eval) {
+                                            try {
+                                              iframeWindow.eval('(' + hideShareOption.toString() + ')();');
+                                            } catch (e) {}
+                                          }
+                                        }
+                                      } catch (e) {
+                                        // Cross-origin restriction - can't access iframe content
+                                      }
+                                      
+                                      // Function to hide elements in a document
+                                      function hideElementsInDoc(doc) {
+                                        if (!doc) return;
+                                        
+                                        try {
+                                      
+                                          // First, try to find and hide buttons with three dots (More options icon)
+                                          var allButtons = doc.querySelectorAll('button, [role="button"]');
+                                          allButtons.forEach(function(btn) {
+                                            try {
+                                              // Check if button contains exactly 3 circles (three dots)
+                                              var svg = btn.querySelector('svg');
+                                              if (svg) {
+                                                var circles = svg.querySelectorAll('circle');
+                                                if (circles.length === 3) {
+                                                  // Check if it's not a known control button
+                                                  var ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+                                                  if (!ariaLabel.includes('play') && 
+                                                      !ariaLabel.includes('pause') &&
+                                                      !ariaLabel.includes('settings') &&
+                                                      !ariaLabel.includes('quality') &&
+                                                      !ariaLabel.includes('captions') &&
+                                                      !ariaLabel.includes('subtitles') &&
+                                                      !ariaLabel.includes('speed') &&
+                                                      !ariaLabel.includes('volume') &&
+                                                      !ariaLabel.includes('mute') &&
+                                                      !ariaLabel.includes('fullscreen')) {
+                                                    // This is likely the "More options" button
+                                                    btn.style.cssText = 'display: none !important; visibility: hidden !important; opacity: 0 !important; width: 0 !important; height: 0 !important; padding: 0 !important; margin: 0 !important; pointer-events: none !important; position: absolute !important; left: -9999px !important;';
+                                                    try {
+                                                      if (btn.parentNode) {
+                                                        btn.parentNode.removeChild(btn);
+                                                      }
+                                                    } catch (e) {}
+                                                  }
+                                                }
+                                              }
+                                            } catch (e) {}
+                                          });
+                                          
+                                          // Target ALL elements and check for "Share" text and "More options" button
+                                          var allElements = doc.querySelectorAll('*');
+                                          allElements.forEach(function(el) {
+                                            try {
+                                              var ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase().trim();
+                                              var title = (el.getAttribute('title') || '').toLowerCase().trim();
+                                              var text = (el.textContent || '').trim().toLowerCase();
+                                              var role = (el.getAttribute('role') || '').toLowerCase().trim();
+                                              var tagName = (el.tagName || '').toLowerCase();
+                                              var className = (el.className || '').toLowerCase();
+                                              
+                                              // Check if it's the "Share" option
+                                              var isShare = false;
+                                              if (ariaLabel === 'share' || title === 'share' || text === 'share') {
+                                                isShare = true;
+                                              }
+                                              if (!isShare && text.startsWith('share') && text.length < 20) {
+                                                var words = text.split(/[\s\n\r]+/);
+                                                if (words.some(function(word) { return word === 'share'; })) {
+                                                  isShare = true;
+                                                }
+                                              }
+                                              
+                                              // Check if it's the "More options" button - very aggressive detection
+                                              var isMoreOptions = false;
+                                              
+                                              // Check for buttons with exactly 3 circles (three dots icon)
+                                              var circles = el.querySelectorAll('circle');
+                                              var hasThreeDots = circles.length === 3;
+                                              
+                                              // Check for three dots in SVG paths
+                                              if (!hasThreeDots) {
+                                                var svg = el.querySelector('svg');
+                                                if (svg) {
+                                                  var paths = svg.querySelectorAll('path');
+                                                  paths.forEach(function(path) {
+                                                    var d = path.getAttribute('d') || '';
+                                                    var mCommands = d.match(/M[^M]*/g);
+                                                    if (mCommands && mCommands.length >= 3) {
+                                                      hasThreeDots = true;
+                                                    }
+                                                  });
+                                                }
+                                              }
+                                              
+                                              // If it has three dots, it's likely the "More options" button
+                                              if (hasThreeDots && (tagName === 'button' || role === 'button')) {
+                                                // Make sure it's not another control
+                                                if (!ariaLabel.includes('settings') && 
+                                                    !ariaLabel.includes('quality') && 
+                                                    !ariaLabel.includes('captions') &&
+                                                    !ariaLabel.includes('subtitles') &&
+                                                    !ariaLabel.includes('speed') &&
+                                                    !ariaLabel.includes('play') &&
+                                                    !ariaLabel.includes('pause') &&
+                                                    !ariaLabel.includes('volume') &&
+                                                    !ariaLabel.includes('mute') &&
+                                                    !ariaLabel.includes('fullscreen')) {
+                                                  isMoreOptions = true;
+                                                }
+                                              }
+                                              
+                                              // Check aria-label and title
+                                              if (!isMoreOptions) {
+                                                if (ariaLabel.includes('more') && (ariaLabel.includes('option') || ariaLabel.includes('menu'))) {
+                                                  isMoreOptions = true;
+                                                }
+                                                if (title.includes('more') && (title.includes('option') || title.includes('menu'))) {
+                                                  isMoreOptions = true;
+                                                }
+                                                // Check for buttons with menu-related attributes
+                                                if ((tagName === 'button' || role === 'button') && 
+                                                    (ariaLabel.includes('more') || ariaLabel.includes('menu') || 
+                                                     title.includes('more') || title.includes('menu'))) {
+                                                  // Double check it's not another control
+                                                  if (!ariaLabel.includes('settings') && 
+                                                      !ariaLabel.includes('quality') && 
+                                                      !ariaLabel.includes('captions') &&
+                                                      !ariaLabel.includes('subtitles') &&
+                                                      !ariaLabel.includes('speed') &&
+                                                      !ariaLabel.includes('play') &&
+                                                      !ariaLabel.includes('pause')) {
+                                                    isMoreOptions = true;
+                                                  }
+                                                }
+                                                // Check for three-dot menu buttons (common pattern)
+                                                if (tagName === 'button' && 
+                                                    (ariaLabel === 'more' || ariaLabel === 'menu' || 
+                                                     title === 'more' || title === 'menu')) {
+                                                  isMoreOptions = true;
+                                                }
+                                              }
+                                              
+                                              if (isShare || isMoreOptions) {
+                                                // Completely hide and remove
+                                                el.style.cssText = 'display: none !important; visibility: hidden !important; opacity: 0 !important; width: 0 !important; height: 0 !important; padding: 0 !important; margin: 0 !important; pointer-events: none !important; position: absolute !important; left: -9999px !important;';
+                                                
+                                                // Remove from DOM
+                                                try {
+                                                  if (el.parentNode) {
+                                                    el.parentNode.removeChild(el);
+                                                  }
+                                                } catch (e) {}
+                                              }
+                                            } catch (e) {}
+                                          });
                                         } catch (e) {}
-                                      });
+                                      }
+                                      
+                                      // Hide in main document
+                                      hideElementsInDoc(document);
+                                      
+                                      // Try to hide in iframe document if accessible
+                                      if (iframeDoc) {
+                                        hideElementsInDoc(iframeDoc);
+                                      }
                                     } catch (e) {
                                       console.log('Error hiding share option: ' + e);
                                     }
@@ -304,16 +635,23 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                   
                                   // Run immediately
                                   hideShareOption();
+                                  hideSignInPrompt();
                                   
                                   // Run on DOM ready
                                   if (document.readyState === 'loading') {
-                                    document.addEventListener('DOMContentLoaded', hideShareOption);
+                                    document.addEventListener('DOMContentLoaded', function() {
+                                      hideShareOption();
+                                      hideSignInPrompt();
+                                    });
                                   }
                                   
                                   // Run on window load
-                                  window.addEventListener('load', hideShareOption);
+                                  window.addEventListener('load', function() {
+                                    hideShareOption();
+                                    hideSignInPrompt();
+                                  });
                                   
-                                  // Global click interceptor to catch share button clicks
+                                  // Global click interceptor to catch share, more options, and sign-in button clicks
                                   document.addEventListener('click', function(e) {
                                     var target = e.target;
                                     if (target) {
@@ -321,13 +659,34 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                       var ariaLabel = (target.getAttribute('aria-label') || '').toLowerCase().trim();
                                       var title = (target.getAttribute('title') || '').toLowerCase().trim();
                                       
-                                      if (text === 'share' || 
+                                      // Check for Share
+                                      var isShare = text === 'share' || 
                                           ariaLabel === 'share' || 
                                           title === 'share' ||
-                                          (text.startsWith('share') && text.length < 15)) {
+                                          (text.startsWith('share') && text.length < 15);
+                                      
+                                      // Check for More options
+                                      var isMoreOptions = (ariaLabel.includes('more') && (ariaLabel.includes('option') || ariaLabel.includes('menu'))) ||
+                                          (title.includes('more') && (title.includes('option') || title.includes('menu'))) ||
+                                          ariaLabel === 'more' || ariaLabel === 'menu' ||
+                                          title === 'more' || title === 'menu';
+                                      
+                                      // Check for Sign in / Log in
+                                      var isSignIn = (text.includes('sign') && text.includes('in')) ||
+                                          (text.includes('log') && text.includes('in')) ||
+                                          (ariaLabel.includes('sign') && ariaLabel.includes('in')) ||
+                                          (ariaLabel.includes('log') && ariaLabel.includes('in')) ||
+                                          (title.includes('sign') && title.includes('in')) ||
+                                          (title.includes('log') && title.includes('in'));
+                                      
+                                      if (isShare || isMoreOptions || isSignIn) {
                                         e.preventDefault();
                                         e.stopPropagation();
                                         e.stopImmediatePropagation();
+                                        // Hide the sign-in prompt after click attempt
+                                        if (isSignIn) {
+                                          setTimeout(hideSignInPrompt, 100);
+                                        }
                                         return false;
                                       }
                                       
@@ -336,7 +695,10 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                       if (parent) {
                                         var parentText = (parent.textContent || '').toLowerCase().trim();
                                         var parentAriaLabel = (parent.getAttribute('aria-label') || '').toLowerCase().trim();
-                                        if (parentText === 'share' || parentAriaLabel === 'share') {
+                                        var parentTitle = (parent.getAttribute('title') || '').toLowerCase().trim();
+                                        if (parentText === 'share' || parentAriaLabel === 'share' ||
+                                            (parentAriaLabel.includes('more') && (parentAriaLabel.includes('option') || parentAriaLabel.includes('menu'))) ||
+                                            (parentTitle.includes('more') && (parentTitle.includes('option') || parentTitle.includes('menu')))) {
                                           e.preventDefault();
                                           e.stopPropagation();
                                           e.stopImmediatePropagation();
@@ -356,8 +718,12 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                           mutation.addedNodes.forEach(function(node) {
                                             if (node.nodeType === 1) {
                                               var text = (node.textContent || '').toLowerCase();
-                                              if (text.includes('share') || 
-                                                  (node.getAttribute && (node.getAttribute('aria-label') || '').toLowerCase().includes('share'))) {
+                                              var ariaLabel = (node.getAttribute && node.getAttribute('aria-label') || '').toLowerCase();
+                                              var title = (node.getAttribute && node.getAttribute('title') || '').toLowerCase();
+                                              if (text.includes('share') || ariaLabel.includes('share') ||
+                                                  (ariaLabel.includes('more') && (ariaLabel.includes('option') || ariaLabel.includes('menu'))) ||
+                                                  (title.includes('more') && (title.includes('option') || title.includes('menu'))) ||
+                                                  ariaLabel === 'more' || ariaLabel === 'menu') {
                                                 hasMenuChanges = true;
                                               }
                                             }
@@ -366,7 +732,23 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                       });
                                       if (hasMenuChanges) {
                                         hideShareOption();
+                                        createBlockerOverlay();
                                       }
+                                      
+                                      // Also check if iframe was added/changed
+                                      mutations.forEach(function(mutation) {
+                                        if (mutation.addedNodes.length > 0) {
+                                          mutation.addedNodes.forEach(function(node) {
+                                            if (node.nodeType === 1) {
+                                              if (node.tagName === 'IFRAME' || node.querySelector('iframe')) {
+                                                setTimeout(function() {
+                                                  createBlockerOverlay();
+                                                }, 100);
+                                              }
+                                            }
+                                          });
+                                        }
+                                      });
                                     });
                                     
                                     observer.observe(targetNode, {
@@ -377,31 +759,106 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                     });
                                   }
                                   
-                                  // Check very frequently to catch share options immediately
+                                  // Check very frequently to catch share options and sign-in prompts immediately - more aggressive
                                   var checkCount = 0;
                                   var intervalId = setInterval(function() {
                                     checkCount++;
-                                    var iframe = document.querySelector('iframe[src*="vimeo"], iframe[src*="player"]');
-                                    if (iframe && iframe.offsetParent) {
-                                      hideShareOption();
+                                    hideShareOption();
+                                    hideSignInPrompt();
+                                    // Recreate blocker overlay periodically to ensure it's always there
+                                    if (checkCount % 5 === 0) {
+                                      createBlockerOverlay();
                                     }
-                                    // Keep checking for longer to catch dynamically opened menus
-                                    if (checkCount > 200) {
+                                    // Keep checking for much longer to catch all cases
+                                    if (checkCount > 500) {
                                       clearInterval(intervalId);
                                     }
-                                  }, 200);
+                                  }, 100); // Check every 100ms instead of 200ms
+                                  
+                                  // Also run immediately multiple times
+                                  hideShareOption();
+                                  hideSignInPrompt();
+                                  setTimeout(function() { hideShareOption(); hideSignInPrompt(); }, 100);
+                                  setTimeout(function() { hideShareOption(); hideSignInPrompt(); }, 300);
+                                  setTimeout(function() { hideShareOption(); hideSignInPrompt(); }, 500);
+                                  setTimeout(function() { hideShareOption(); hideSignInPrompt(); }, 1000);
+                                  setTimeout(function() { hideShareOption(); hideSignInPrompt(); }, 2000);
+                                  setTimeout(function() { hideShareOption(); hideSignInPrompt(); }, 3000);
                                 })();
                               ''');
-                              });
                               
-                              // Also inject after delays to catch late-loading share options
+                              // Inject multiple times with different delays for maximum coverage
+                              Future.delayed(const Duration(milliseconds: 500), () {
+                                controller.evaluateJavascript(source: 'if (window.hideShareOption) window.hideShareOption(); if (window.hideSignInPrompt) window.hideSignInPrompt();');
+                              });
+                              Future.delayed(const Duration(milliseconds: 1000), () {
+                                controller.evaluateJavascript(source: 'if (window.hideShareOption) window.hideShareOption(); if (window.hideSignInPrompt) window.hideSignInPrompt();');
+                              });
+                              Future.delayed(const Duration(milliseconds: 2000), () {
+                                controller.evaluateJavascript(source: 'if (window.hideShareOption) window.hideShareOption(); if (window.hideSignInPrompt) window.hideSignInPrompt();');
+                              });
+                              Future.delayed(const Duration(milliseconds: 3000), () {
+                                controller.evaluateJavascript(source: 'if (window.hideShareOption) window.hideShareOption(); if (window.hideSignInPrompt) window.hideSignInPrompt();');
+                              });
                               Future.delayed(const Duration(milliseconds: 5000), () {
-                                controller.evaluateJavascript(source: 'if (window.hideShareOption) window.hideShareOption();');
+                                controller.evaluateJavascript(source: 'if (window.hideShareOption) window.hideShareOption(); if (window.hideSignInPrompt) window.hideSignInPrompt();');
                               });
                               Future.delayed(const Duration(milliseconds: 8000), () {
-                                controller.evaluateJavascript(source: 'if (window.hideShareOption) window.hideShareOption();');
+                                controller.evaluateJavascript(source: 'if (window.hideShareOption) window.hideShareOption(); if (window.hideSignInPrompt) window.hideSignInPrompt();');
+                              });
+                              Future.delayed(const Duration(milliseconds: 10000), () {
+                                controller.evaluateJavascript(source: 'if (window.hideShareOption) window.hideShareOption(); if (window.hideSignInPrompt) window.hideSignInPrompt();');
                               });
                             },
+                          ),
+                          // Overlay to block "More options" button in top-right corner
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: _showMoreOptionsLockedMessage,
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  alignment: Alignment.center,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 64,
+                                    minHeight: 48,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.65),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: const Color(0xFFEF4444).withOpacity(0.5),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: const [
+                                      Icon(
+                                        Icons.lock,
+                                        color: Colors.white,
+                                        size: 14,
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Locked',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                           // Fullscreen button overlay
                           Positioned(

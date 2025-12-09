@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/testimonial.dart';
 import 'api_client.dart';
+import '../utils/json_parser.dart';
 
 class TestimonialService {
   static List<Testimonial>? _cachedTestimonials;
@@ -92,7 +93,8 @@ class TestimonialService {
       
       if (response.statusCode == 200) {
         try {
-          final Map<String, dynamic> data = json.decode(response.body);
+          // Parse JSON in background thread to avoid blocking UI
+          final Map<String, dynamic> data = await JsonParser.parseJson(response.body);
           debugPrint('✅ JSON decoded successfully');
           
           if (data.containsKey('data') && data['data'] is Map) {

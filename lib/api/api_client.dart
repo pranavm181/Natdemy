@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 
 class ApiClient {
   static const String baseUrl = 'https://lms.natdemy.com';
+  static const int maxRetries = 3;
+  static const Duration baseRetryDelay = Duration(seconds: 2);
   
   // Get authentication token from storage
   static Future<String?> getToken() async {
@@ -37,11 +39,12 @@ class ApiClient {
     }
   }
   
-  // Get headers for API requests
+  // Get headers for API requests (optimized with gzip support)
   static Future<Map<String, String>> getHeaders({bool includeAuth = true}) async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'Accept-Encoding': 'gzip, deflate', // Enable compression
     };
     
     if (includeAuth) {
@@ -54,13 +57,50 @@ class ApiClient {
     return headers;
   }
   
-  // GET request
+  // Retry logic with exponential backoff
+  static Future<http.Response> _retryRequest(
+    Future<http.Response> Function() requestFn, {
+    int maxRetries = maxRetries,
+  }) async {
+    int retries = 0;
+    
+    while (retries < maxRetries) {
+      try {
+        final response = await requestFn();
+        
+        // Retry on server errors (5xx) but not on client errors (4xx)
+        if (response.statusCode >= 500 && retries < maxRetries - 1) {
+          retries++;
+          final delay = Duration(seconds: baseRetryDelay.inSeconds * retries);
+          debugPrint('⚠️ Server error ${response.statusCode}, retrying in ${delay.inSeconds}s (attempt $retries/$maxRetries)');
+          await Future.delayed(delay);
+          continue;
+        }
+        
+        return response;
+      } catch (e) {
+        retries++;
+        if (retries >= maxRetries) {
+          debugPrint('❌ Request failed after $maxRetries attempts: $e');
+          rethrow;
+        }
+        
+        final delay = Duration(seconds: baseRetryDelay.inSeconds * retries);
+        debugPrint('⚠️ Request error, retrying in ${delay.inSeconds}s (attempt $retries/$maxRetries): $e');
+        await Future.delayed(delay);
+      }
+    }
+    
+    throw Exception('Request failed after $maxRetries retries');
+  }
+  
+  // GET request with retry logic
   static Future<http.Response> get(
     String endpoint, {
     Map<String, String>? queryParams,
     bool includeAuth = true,
   }) async {
-    try {
+    return _retryRequest(() async {
       var uri = Uri.parse('$baseUrl$endpoint');
       
       // Add query parameters if provided
@@ -68,74 +108,54 @@ class ApiClient {
         uri = uri.replace(queryParameters: queryParams);
       }
       
-      final response = await http.get(
+      return await http.get(
         uri,
         headers: await getHeaders(includeAuth: includeAuth),
       );
-      
-      return response;
-    } catch (e) {
-      debugPrint('GET request error: $e');
-      rethrow;
-    }
+    });
   }
   
-  // POST request
+  // POST request with retry logic
   static Future<http.Response> post(
     String endpoint, {
     Map<String, dynamic>? body,
     bool includeAuth = true,
   }) async {
-    try {
-      final response = await http.post(
+    return _retryRequest(() async {
+      return await http.post(
         Uri.parse('$baseUrl$endpoint'),
         headers: await getHeaders(includeAuth: includeAuth),
         body: body != null ? json.encode(body) : null,
       );
-      
-      return response;
-    } catch (e) {
-      debugPrint('POST request error: $e');
-      rethrow;
-    }
+    });
   }
   
-  // PUT request
+  // PUT request with retry logic
   static Future<http.Response> put(
     String endpoint, {
     Map<String, dynamic>? body,
     bool includeAuth = true,
   }) async {
-    try {
-      final response = await http.put(
+    return _retryRequest(() async {
+      return await http.put(
         Uri.parse('$baseUrl$endpoint'),
         headers: await getHeaders(includeAuth: includeAuth),
         body: body != null ? json.encode(body) : null,
       );
-      
-      return response;
-    } catch (e) {
-      debugPrint('PUT request error: $e');
-      rethrow;
-    }
+    });
   }
   
-  // DELETE request
+  // DELETE request with retry logic
   static Future<http.Response> delete(
     String endpoint, {
     bool includeAuth = true,
   }) async {
-    try {
-      final response = await http.delete(
+    return _retryRequest(() async {
+      return await http.delete(
         Uri.parse('$baseUrl$endpoint'),
         headers: await getHeaders(includeAuth: includeAuth),
       );
-      
-      return response;
-    } catch (e) {
-      debugPrint('DELETE request error: $e');
-      rethrow;
-    }
+    });
   }
   
   // Handle API response and parse JSON

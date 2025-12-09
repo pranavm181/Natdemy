@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -27,27 +28,44 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   bool _isLoading = true;
   bool _hasLoadedOnce = false;
   DateTime? _lastLoadTime;
+  bool _isLoadingChapters = false;
+  Set<String> _loadedChapters = {}; // Track which courses have loaded chapters
+  static const int _chapterChunkSize = 5;
+  final ScrollController _coursesScrollController = ScrollController();
+  final Map<String, int> _visibleChapterCounts = {};
 
   @override
   void initState() {
     super.initState();
-    _loadCourses(forceRefresh: true);
+    _coursesScrollController.addListener(_handleCoursesScroll);
+    // Load from cache first for instant display, then refresh in background
+    _loadCourses(forceRefresh: false);
+  }
+
+  @override
+  void dispose() {
+    _coursesScrollController.removeListener(_handleCoursesScroll);
+    _coursesScrollController.dispose();
+    super.dispose();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Refresh courses when screen becomes visible, but avoid reloading immediately after initState
-    // Only reload if it's been more than 2 seconds since last load (to check for verification updates)
+    // Only refresh in background if we haven't loaded yet or it's been a while
+    // Don't block UI - use cache first, refresh in background
     final now = DateTime.now();
-    final shouldReload = !_hasLoadedOnce || 
+    final shouldRefreshInBackground = !_hasLoadedOnce || 
                         _lastLoadTime == null || 
-                        now.difference(_lastLoadTime!).inSeconds > 2;
+                        now.difference(_lastLoadTime!).inSeconds > 30; // Only refresh after 30 seconds
     
-    if (shouldReload) {
+    if (shouldRefreshInBackground) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _loadCourses(forceRefresh: true);
+          // Refresh in background without blocking UI
+          _loadCourses(forceRefresh: true).catchError((e) {
+            debugPrint('Background refresh error: $e');
+          });
         }
       });
     }
@@ -64,33 +82,101 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
 
   Future<void> _loadCourses({bool forceRefresh = false}) async {
     try {
-      setState(() => _isLoading = true);
-      // Remove delay - not needed
+      // Only show loading if we don't have cached data
+      if (forceRefresh || JoinedCourses.instance.all.isEmpty) {
+        setState(() => _isLoading = true);
+      }
       
-      // Always check verified status from API (forceRefresh ensures full reload)
+      // Load from cache first if available, then refresh in background if needed
+      if (!forceRefresh && JoinedCourses.instance.all.isNotEmpty) {
+        // We have cached data, show it immediately
+        final joined = JoinedCourses.instance.all;
+        JoinedCourse? nextSelected;
+        if (joined.isNotEmpty && _selected == null) {
+          nextSelected = joined.first;
+        } else if (joined.isNotEmpty) {
+          // Try to keep current selection
+          final currentSelectedId = _selected?.courseId;
+          final currentSelectedStreamId = _selected?.streamId;
+          if (currentSelectedId != null && currentSelectedStreamId != null) {
+            nextSelected = joined.firstWhere(
+              (c) => c.courseId == currentSelectedId && c.streamId == currentSelectedStreamId,
+              orElse: () => joined.first,
+            );
+          } else {
+            nextSelected = joined.first;
+          }
+        }
+        
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _hasLoadedOnce = true;
+            _lastLoadTime = DateTime.now();
+          });
+          if (nextSelected != null && _selected == null) {
+            _setSelectedCourse(nextSelected!, resetVisibility: true);
+          }
+        }
+        
+        // Refresh in background without blocking
+        JoinedCourses.instance.initialize(widget.student.email, forceRefresh: true)
+          .then((_) {
+            if (mounted) {
+              final updated = JoinedCourses.instance.all;
+              if (updated.isNotEmpty) {
+                setState(() {
+                  _lastLoadTime = DateTime.now();
+                  // Update selected course if it still exists
+                  if (_selected != null) {
+                    final updatedSelected = updated.firstWhere(
+                      (c) => c.courseId == _selected!.courseId && c.streamId == _selected!.streamId,
+                      orElse: () => updated.first,
+                    );
+                    if (updatedSelected.courseId != _selected!.courseId || 
+                        updatedSelected.streamId != _selected!.streamId) {
+                      _setSelectedCourse(updatedSelected, resetVisibility: false);
+                    }
+                  }
+                });
+              }
+            }
+          })
+          .catchError((e) {
+            debugPrint('Background refresh error: $e');
+          });
+        
+        return; // Exit early - we've shown cached data
+      }
+      
+      // No cache or force refresh - load from API
       await JoinedCourses.instance.initialize(widget.student.email, forceRefresh: forceRefresh);
       
       if (mounted) {
         final joined = JoinedCourses.instance.all;
+        JoinedCourse? nextSelected;
+        if (joined.isNotEmpty) {
+          final currentSelectedId = _selected?.courseId;
+          final currentSelectedStreamId = _selected?.streamId;
+          if (currentSelectedId != null && currentSelectedStreamId != null) {
+            nextSelected = joined.firstWhere(
+              (c) => c.courseId == currentSelectedId && c.streamId == currentSelectedStreamId,
+              orElse: () => joined.first,
+            );
+          } else {
+            nextSelected = joined.first;
+          }
+        }
         setState(() {
           _isLoading = false;
           _hasLoadedOnce = true;
           _lastLoadTime = DateTime.now();
-          if (joined.isNotEmpty) {
-            // Update selected course to reflect latest status
-            final currentSelectedId = _selected?.courseId;
-            final currentSelectedStreamId = _selected?.streamId;
-            if (currentSelectedId != null && currentSelectedStreamId != null) {
-              final updatedCourse = joined.firstWhere(
-                (c) => c.courseId == currentSelectedId && c.streamId == currentSelectedStreamId,
-                orElse: () => joined.first,
-              );
-              _selected = updatedCourse;
-            } else {
-              _selected = joined.first;
-            }
-          }
+          // Reset loaded chapters when courses are refreshed
+          _loadedChapters.clear();
         });
+        if (nextSelected != null) {
+          _setSelectedCourse(nextSelected!, resetVisibility: true);
+        }
       }
     } catch (e) {
       debugPrint('Error loading courses: $e');
@@ -102,6 +188,119 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
         });
       }
     }
+  }
+
+  Future<void> _loadChaptersForSelectedCourse() async {
+    final selectedCourse = _selected;
+    if (selectedCourse == null || 
+        selectedCourse.courseId == null || 
+        selectedCourse.streamId == null ||
+        !selectedCourse.isEnrolled) {
+      return;
+    }
+
+    final courseKey = '${selectedCourse.courseId}_${selectedCourse.streamId}';
+    if (_loadedChapters.contains(courseKey)) {
+      return; // Already loaded
+    }
+
+    if (_isLoadingChapters) {
+      return; // Already loading
+    }
+
+    setState(() {
+      _isLoadingChapters = true;
+    });
+
+    try {
+      await JoinedCourses.instance.loadChaptersForCourse(
+        selectedCourse.courseId!,
+        selectedCourse.streamId!,
+      );
+
+      if (mounted) {
+        // Update selected course with loaded chapters
+        final updated = JoinedCourses.instance.all.firstWhere(
+          (c) => c.courseId == selectedCourse.courseId && c.streamId == selectedCourse.streamId,
+          orElse: () => selectedCourse,
+        );
+        
+        setState(() {
+          _selected = updated;
+          _loadedChapters.add(courseKey);
+          _isLoadingChapters = false;
+          _resetChapterVisibilityForCourse(updated);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading chapters: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingChapters = false;
+        });
+      }
+    }
+  }
+
+  void _handleCoursesScroll() {
+    if (!_coursesScrollController.hasClients) return;
+    final position = _coursesScrollController.position;
+    if (position.maxScrollExtent <= 0) return;
+    if (position.pixels >= position.maxScrollExtent - 150) {
+      _increaseVisibleChaptersForSelected();
+    }
+  }
+
+  void _increaseVisibleChaptersForSelected() {
+    final selectedCourse = _selected;
+    if (selectedCourse == null) return;
+    final chapters = _resolveAssignedChapters(selectedCourse);
+    if (chapters.isEmpty) return;
+    final key = _courseKey(selectedCourse);
+    final current = _visibleChapterCounts[key] ?? math.min(_chapterChunkSize, chapters.length);
+    if (current >= chapters.length) return;
+    setState(() {
+      _visibleChapterCounts[key] = math.min(current + _chapterChunkSize, chapters.length);
+    });
+  }
+
+  String _courseKey(JoinedCourse course) {
+    final courseId = course.courseId?.toString() ?? course.title;
+    final streamId = course.streamId?.toString() ?? 'stream';
+    return '$courseId-$streamId';
+  }
+
+  void _resetChapterVisibilityForCourse(JoinedCourse course) {
+    final key = _courseKey(course);
+    final total = _resolveAssignedChapters(course).length;
+    _visibleChapterCounts[key] = total == 0 ? 0 : math.min(_chapterChunkSize, total);
+  }
+
+  void _ensureChapterVisibilityForCourse(JoinedCourse course) {
+    final key = _courseKey(course);
+    if (!_visibleChapterCounts.containsKey(key)) {
+      _resetChapterVisibilityForCourse(course);
+      return;
+    }
+    final total = _resolveAssignedChapters(course).length;
+    final current = _visibleChapterCounts[key] ?? 0;
+    if (current == 0 && total > 0) {
+      _visibleChapterCounts[key] = math.min(_chapterChunkSize, total);
+    } else if (current > total) {
+      _visibleChapterCounts[key] = total;
+    }
+  }
+
+  void _setSelectedCourse(JoinedCourse course, {bool resetVisibility = false}) {
+    setState(() {
+      _selected = course;
+      _isLoadingChapters = false;
+      if (resetVisibility) {
+        _resetChapterVisibilityForCourse(course);
+      } else {
+        _ensureChapterVisibilityForCourse(course);
+      }
+    });
   }
 
   @override
@@ -187,6 +386,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
         onRefresh: () => _loadCourses(forceRefresh: true),
         child: joined.isEmpty
             ? ListView(
+                controller: _coursesScrollController,
                 children: [
                   SizedBox(
                     height: MediaQuery.of(context).size.height * 0.7,
@@ -197,6 +397,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
             : AppAnimations.fadeSlideIn(
               delay: 100,
               child: ListView(
+                controller: _coursesScrollController,
                 padding: EdgeInsets.only(
                   left: 16,
                   right: 16,
@@ -251,6 +452,10 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
       return const SizedBox.shrink();
     }
 
+    // Don't load chapters automatically - only load when user wants to view them
+    final courseKey = '${selectedCourse.courseId}_${selectedCourse.streamId}';
+    final chaptersLoaded = _loadedChapters.contains(courseKey);
+
     // Show locked message if course is not enrolled
     if (!selectedCourse.isEnrolled) {
       return Card(
@@ -304,6 +509,11 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
 
     final streamTitle = _resolveStreamTitle(selectedCourse);
     final chapters = _resolveAssignedChapters(selectedCourse);
+    final totalChapters = chapters.length;
+    final visibleCount = _visibleChapterCounts[courseKey] ??
+        (totalChapters == 0 ? 0 : math.min(_chapterChunkSize, totalChapters));
+    final visibleChapters = chapters.take(visibleCount).toList();
+    final hasMoreChapters = visibleCount < totalChapters;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,7 +528,33 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
               ),
         ),
         const SizedBox(height: 16),
-        if (chapters.isEmpty)
+        // Show loading state
+        if (_isLoadingChapters && !chaptersLoaded)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24.0),
+              child: ThemePulsingDotsIndicator(size: 10.0, spacing: 12.0),
+            ),
+          )
+        // Show button to load chapters if not loaded yet
+        else if (!chaptersLoaded && selectedCourse.courseId != null && selectedCourse.streamId != null)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: OutlinedButton.icon(
+                onPressed: _loadChaptersForSelectedCourse,
+                icon: const Icon(Icons.book_outlined),
+                label: const Text('Load Chapters'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  side: const BorderSide(color: Color(0xFF582DB0), width: 2),
+                  foregroundColor: const Color(0xFF582DB0),
+                ),
+              ),
+            ),
+          )
+        // Show empty state if chapters loaded but empty
+        else if (chapters.isEmpty && chaptersLoaded)
           const Text(
             'No chapters available for this stream yet.',
             style: TextStyle(
@@ -327,84 +563,154 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
               fontWeight: FontWeight.w500,
             ),
           )
-        else
-          ..._buildChapterTiles(context, chapters),
-      ],
-    );
-  }
+        // Show chapters list if loaded
+        else if (chaptersLoaded && visibleChapters.isNotEmpty) ...[
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: visibleChapters.length,
+            itemBuilder: (context, index) {
+              final chapter = visibleChapters[index];
+              final lessonCount = chapter.lessons.length;
+              final videoCount = chapter.lessons.fold<int>(
+                0,
+                (sum, lesson) => sum + lesson.videos.length,
+              );
+              String? subtitleText;
+              if (lessonCount > 0 || videoCount > 0) {
+                final parts = <String>[];
+                if (lessonCount > 0) {
+                  parts.add('$lessonCount lesson${lessonCount == 1 ? '' : 's'}');
+                }
+                if (videoCount > 0) {
+                  parts.add('$videoCount video${videoCount == 1 ? '' : 's'}');
+                }
+                subtitleText = parts.join(' • ');
+              }
 
-  List<Widget> _buildChapterTiles(BuildContext context, List<CourseChapter> chapters) {
-    return chapters.map((chapter) {
-      final lessonCount = chapter.lessons.length;
-      // Count total videos across all lessons in this chapter
-      final videoCount = chapter.lessons.fold<int>(
-        0,
-        (sum, lesson) => sum + lesson.videos.length,
-      );
-      
-      // Build subtitle text showing lessons and videos
-      String? subtitleText;
-      if (lessonCount > 0 || videoCount > 0) {
-        final parts = <String>[];
-        if (lessonCount > 0) {
-          parts.add('$lessonCount lesson${lessonCount == 1 ? '' : 's'}');
-        }
-        if (videoCount > 0) {
-          parts.add('$videoCount video${videoCount == 1 ? '' : 's'}');
-        }
-        subtitleText = parts.join(' • ');
-      }
-      
-      return Card(
-        elevation: 8,
-        shadowColor: Colors.black.withOpacity(0.15),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0xFF582DB0), width: 2),
-        ),
-        child: ListTile(
-          leading: Icon(
-            Icons.book_outlined,
-            color: const Color(0xFF582DB0),
-            size: 28,
-          ),
-          title: Text(
-            chapter.title,
-            style: const TextStyle(
-              color: Color(0xFF1E293B),
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-            ),
-          ),
-          subtitle: subtitleText != null
-              ? Text(
-                  subtitleText,
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
+              return Card(
+                elevation: 8,
+                shadowColor: Colors.black.withOpacity(0.15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: Color(0xFF582DB0), width: 2),
+                ),
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: const Icon(
+                    Icons.book_outlined,
+                    color: Color(0xFF582DB0),
+                    size: 28,
                   ),
-                )
-              : null,
-          trailing: const Icon(
-            Icons.chevron_right,
-            color: Color(0xFF582DB0),
-            size: 28,
+                  title: Text(
+                    chapter.title,
+                    style: const TextStyle(
+                      color: Color(0xFF1E293B),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                  subtitle: subtitleText != null
+                      ? Text(
+                          subtitleText,
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        )
+                      : null,
+                  trailing: const Icon(
+                    Icons.chevron_right,
+                    color: Color(0xFF582DB0),
+                    size: 28,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  onTap: () async {
+                    // Ensure chapters are loaded before navigating
+                    if (!chaptersLoaded && selectedCourse.courseId != null && selectedCourse.streamId != null) {
+                      // Show loading
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => const Center(
+                          child: Card(
+                            child: Padding(
+                              padding: EdgeInsets.all(24.0),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ThemePulsingDotsIndicator(size: 12.0, spacing: 16.0),
+                                  SizedBox(height: 16),
+                                  Text('Loading chapter...'),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                      
+                      await _loadChaptersForSelectedCourse();
+                      
+                      if (mounted) {
+                        Navigator.of(context).pop(); // Close loading dialog
+                        
+                        // Get updated course with chapters
+                        final updated = JoinedCourses.instance.all.firstWhere(
+                          (c) => c.courseId == selectedCourse.courseId && c.streamId == selectedCourse.streamId,
+                          orElse: () => selectedCourse,
+                        );
+                        
+                        // Find the chapter in updated course
+                        final updatedChapters = updated.chapters;
+                        final updatedChapter = updatedChapters.firstWhere(
+                          (c) => c.id == chapter.id || c.title == chapter.title,
+                          orElse: () => chapter,
+                        );
+                        
+                        if (mounted) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => SubjectDetailPage(
+                                courseTitle: selectedCourse.title,
+                                chapter: updatedChapter,
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                    } else {
+                      // Chapters already loaded, navigate directly
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SubjectDetailPage(
+                            courseTitle: selectedCourse.title,
+                            chapter: chapter,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              );
+            },
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => SubjectDetailPage(
-                  courseTitle: _selected!.title,
-                  chapter: chapter,
+          if (hasMoreChapters)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: OutlinedButton.icon(
+                onPressed: _increaseVisibleChaptersForSelected,
+                icon: const Icon(Icons.expand_more),
+                label: const Text('Load more chapters'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF582DB0),
+                  side: const BorderSide(color: Color(0xFF582DB0), width: 1.5),
                 ),
               ),
-            );
-          },
-        ),
-      );
-    }).toList();
+            ),
+        ],
+      ],
+    );
   }
 
   Widget _contactSection(BuildContext context) {
@@ -766,9 +1072,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                         child: InkWell(
                           borderRadius: BorderRadius.circular(16),
                           onTap: () {
-                            setState(() {
-                              _selected = course;
-                            });
+                            _setSelectedCourse(course, resetVisibility: true);
                             Navigator.of(context).pop();
                           },
                           child: Padding(
@@ -777,9 +1081,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                               title: displayStreamTitle,
                               isSelectedChip: isSelected,
                               onTap: () {
-                                setState(() {
-                                  _selected = course;
-                                });
+                                _setSelectedCourse(course, resetVisibility: true);
                                 Navigator.of(context).pop();
                               },
                             ),
@@ -910,6 +1212,24 @@ class _Banner extends StatelessWidget {
                           width: 64,
                           height: 64,
                           fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              width: 64,
+                              height: 64,
+                              color: Colors.grey[200],
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF582DB0)),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                           errorBuilder: (context, error, stackTrace) {
                             return Icon(
                               CourseUtils.getCourseIcon(selected.title),
@@ -917,6 +1237,8 @@ class _Banner extends StatelessWidget {
                               size: 48,
                             );
                           },
+                          cacheWidth: 128, // Cache smaller image for better performance
+                          cacheHeight: 128,
                         ),
                       )
                     : Icon(

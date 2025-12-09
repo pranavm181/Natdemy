@@ -25,7 +25,8 @@ class EnrollmentService {
       
       if (response.statusCode == 200) {
         try {
-          final Map<String, dynamic> data = json.decode(response.body);
+          // Parse JSON in background thread to avoid blocking UI
+          final Map<String, dynamic> data = await JsonParser.parseJson(response.body);
           debugPrint('✅ JSON decoded successfully');
           
           if (data.containsKey('data') && data['data'] is Map) {

@@ -6,6 +6,7 @@ import '../data/course_catalog.dart';
 import '../data/joined_courses.dart';
 import 'api_client.dart';
 import 'course_service.dart';
+import '../utils/json_parser.dart';
 
 double? _asDouble(dynamic value) {
   if (value == null) return null;
@@ -36,7 +37,8 @@ class StudentService {
       final response = await ApiClient.get('/api/students/', queryParams: {'format': 'json'}, includeAuth: false);
       
       if (response.statusCode == 200) {
-        final List<dynamic> studentsJson = json.decode(response.body);
+        // Parse JSON in background thread
+        final List<dynamic> studentsJson = await JsonParser.parseJsonList(response.body);
         
         // Find student by email (case-insensitive)
         final normalizedEmail = email.toLowerCase().trim();
@@ -69,7 +71,8 @@ class StudentService {
       final response = await ApiClient.get('/api/students/', queryParams: {'format': 'json'}, includeAuth: false);
       
       if (response.statusCode == 200) {
-        final List<dynamic> studentsJson = json.decode(response.body);
+        // Parse JSON in background thread
+        final List<dynamic> studentsJson = await JsonParser.parseJsonList(response.body);
         
         // Find student by ID
         for (var studentJson in studentsJson) {
@@ -101,7 +104,8 @@ class StudentService {
       final response = await ApiClient.get('/api/students/', queryParams: {'format': 'json'}, includeAuth: false);
       
       if (response.statusCode == 200) {
-        final List<dynamic> studentsJson = json.decode(response.body);
+        // Parse JSON in background thread
+        final List<dynamic> studentsJson = await JsonParser.parseJsonList(response.body);
         
         // Find student by email
         for (var studentJson in studentsJson) {
@@ -142,7 +146,8 @@ class StudentService {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> studentsJson = json.decode(response.body);
+        // Parse JSON in background thread
+        final List<dynamic> studentsJson = await JsonParser.parseJsonList(response.body);
 
         for (final studentJson in studentsJson) {
           if (studentJson is! Map<String, dynamic>) continue;
@@ -173,7 +178,8 @@ class StudentService {
       final response = await ApiClient.get('/api/students/', queryParams: {'format': 'json'}, includeAuth: false);
       
       if (response.statusCode == 200) {
-        final List<dynamic> studentsJson = json.decode(response.body);
+        // Parse JSON in background thread
+        final List<dynamic> studentsJson = await JsonParser.parseJsonList(response.body);
         return studentsJson
             .map((json) => _parseStudentFromJson(json as Map<String, dynamic>))
             .toList();
@@ -207,7 +213,8 @@ class StudentService {
         );
 
         if (homeResponse.statusCode == 200) {
-          final Map<String, dynamic> homeData = json.decode(homeResponse.body);
+          // Parse JSON in background thread
+          final Map<String, dynamic> homeData = await JsonParser.parseJson(homeResponse.body);
           final homeDataMap = homeData['data'];
           if (homeDataMap is Map<String, dynamic>) {
             final enrollments = homeDataMap['enrollments'];
@@ -237,7 +244,8 @@ class StudentService {
         throw Exception('Failed to fetch enrollments: ${response.statusCode}');
       }
 
-      final Map<String, dynamic> data = json.decode(response.body);
+      // Parse JSON in background thread
+      final Map<String, dynamic> data = await JsonParser.parseJson(response.body);
       final dataMap = data['data'];
       if (dataMap is! Map<String, dynamic>) {
         debugPrint('⚠️ Enrollments response did not contain data map');
@@ -359,13 +367,40 @@ class StudentService {
         continue;
       }
 
-      final chaptersJson = enrollment['chapters'];
-      final chapters = chaptersJson is List
+      // Parse chapters from enrollment data (includes lessons, videos, materials, MCQs)
+      final chaptersJson = enrollment['chapters'] as List<dynamic>?;
+      final chapters = chaptersJson != null
           ? chaptersJson
               .whereType<Map<String, dynamic>>()
-              .map(CourseChapter.fromJson)
+              .map((chapterJson) {
+                try {
+                  final chapter = CourseChapter.fromJson(chapterJson);
+                  // Debug: Log materials and MCQs found in this chapter
+                  for (final lesson in chapter.lessons) {
+                    if (lesson.materials.isNotEmpty) {
+                      debugPrint('📄 Chapter "${chapter.title}" - Lesson "${lesson.title}": Found ${lesson.materials.length} material(s)');
+                    }
+                    for (final video in lesson.videos) {
+                      if (video.mcqUrl != null && video.mcqUrl!.isNotEmpty) {
+                        debugPrint('📝 Chapter "${chapter.title}" - Lesson "${lesson.title}" - Video "${video.name}": Found MCQ');
+                      }
+                    }
+                  }
+                  return chapter;
+                } catch (e, stackTrace) {
+                  debugPrint('⚠️ Error parsing chapter: $e');
+                  debugPrint('   Stack trace: $stackTrace');
+                  debugPrint('   Chapter data: $chapterJson');
+                  return null;
+                }
+              })
+              .whereType<CourseChapter>()
               .toList()
-          : const <CourseChapter>[];
+          : <CourseChapter>[];
+      
+      if (chapters.isNotEmpty) {
+        debugPrint('📚 Parsed ${chapters.length} chapter(s) with lessons, materials, and MCQs');
+      }
 
       final streamData = enrollment['stream'] ?? enrollment['course_stream'];
       int? streamId;
@@ -487,7 +522,8 @@ class StudentService {
           return;
         }
 
-        final decoded = json.decode(response.body);
+        // Parse JSON in background thread
+        final decoded = await JsonParser.parseJson(response.body);
         if (decoded is! Map<String, dynamic>) {
           debugPrint('⚠️ Unexpected response shape from $endpoint');
           return;

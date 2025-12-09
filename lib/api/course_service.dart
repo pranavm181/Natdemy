@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/course_catalog.dart';
 import '../data/course_stream.dart';
 import 'api_client.dart';
+import '../utils/json_parser.dart';
 
 class CourseService {
   static List<CourseStream> _cachedStreams = [];
@@ -142,7 +143,8 @@ class CourseService {
       
       if (response.statusCode == 200) {
         try {
-          final Map<String, dynamic> data = json.decode(response.body);
+          // Parse JSON in background thread to avoid blocking UI
+          final Map<String, dynamic> data = await JsonParser.parseJson(response.body);
           debugPrint('✅ JSON decoded successfully');
           debugPrint('📦 Response keys: ${data.keys.toList()}');
           
@@ -259,7 +261,8 @@ class CourseService {
       final response = await ApiClient.get('/api/courses/$courseId/', includeAuth: false);
       
       if (response.statusCode == 200) {
-        final Map<String, dynamic> courseJson = json.decode(response.body);
+        // Parse JSON in background thread
+        final Map<String, dynamic> courseJson = await JsonParser.parseJson(response.body);
         return Course.fromJson(courseJson);
       } else {
         debugPrint('❌ Failed to fetch course: ${response.statusCode}');

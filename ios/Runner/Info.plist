@@ -28,6 +28,10 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Natdemy needs access to your photo library so you can choose or update your profile picture.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Natdemy may save your updated profile photo locally to provide a consistent experience across sessions.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

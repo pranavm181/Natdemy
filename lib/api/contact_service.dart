@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
+import '../utils/json_parser.dart';
 
 class ContactInfo {
   const ContactInfo({
@@ -284,7 +285,8 @@ class ContactService {
 
       if (response.statusCode == 200) {
         try {
-          final Map<String, dynamic> data = json.decode(response.body);
+          // Parse JSON in background thread
+          final Map<String, dynamic> data = await JsonParser.parseJson(response.body);
           debugPrint('✅ Contact API response received');
 
           // Handle different response structures

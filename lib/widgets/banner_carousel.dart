@@ -14,10 +14,12 @@ class BannerCarousel extends StatefulWidget {
     super.key,
     required this.banners,
     required this.student,
+    this.onPageChanged,
   });
 
   final List<AppBanner> banners;
   final Student student;
+  final ValueChanged<int>? onPageChanged;
 
   @override
   State<BannerCarousel> createState() => _BannerCarouselState();
@@ -117,6 +119,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                     setState(() {
                       _currentPage = index;
                     });
+                    widget.onPageChanged?.call(index);
                   },
                   itemCount: totalBanners,
                   itemBuilder: (context, index) {

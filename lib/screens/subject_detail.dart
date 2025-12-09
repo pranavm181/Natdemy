@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../data/joined_courses.dart';
@@ -8,7 +9,7 @@ import 'live_upcoming.dart';
 import 'lesson_detail.dart';
 import 'question_bank_page.dart';
 
-class SubjectDetailPage extends StatelessWidget {
+class SubjectDetailPage extends StatefulWidget {
   const SubjectDetailPage({
     super.key,
     required this.chapter,
@@ -17,6 +18,35 @@ class SubjectDetailPage extends StatelessWidget {
 
   final CourseChapter chapter;
   final String? courseTitle;
+
+  @override
+  State<SubjectDetailPage> createState() => _SubjectDetailPageState();
+}
+
+class _SubjectDetailPageState extends State<SubjectDetailPage> {
+  static const int _lessonChunkSize = 6;
+  late final List<CourseLesson> _lessons;
+  late int _visibleLessonCount;
+
+  @override
+  void initState() {
+    super.initState();
+    _lessons = widget.chapter.lessons.isNotEmpty
+        ? widget.chapter.lessons
+        : getLessonsForChapter(widget.chapter.title)
+            .map((name) => CourseLesson(title: name))
+            .toList();
+    _visibleLessonCount =
+        _lessons.isEmpty ? 0 : math.min(_lessonChunkSize, _lessons.length);
+  }
+
+  void _loadMoreLessons() {
+    if (_visibleLessonCount >= _lessons.length) return;
+    setState(() {
+      _visibleLessonCount =
+          math.min(_visibleLessonCount + _lessonChunkSize, _lessons.length);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,9 +65,9 @@ class SubjectDetailPage extends StatelessWidget {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => MaterialsPage(
-              courseTitle: courseTitle ?? chapter.title,
-              courseId: chapter.courseId,
-              chapter: chapter,
+              courseTitle: widget.courseTitle ?? widget.chapter.title,
+              courseId: widget.chapter.courseId,
+              chapter: widget.chapter,
             ),
           ),
         );
@@ -50,11 +80,8 @@ class SubjectDetailPage extends StatelessWidget {
       }),
     ];
 
-    final lessons = chapter.lessons.isNotEmpty
-        ? chapter.lessons
-        : getLessonsForChapter(chapter.title)
-            .map((name) => CourseLesson(title: name))
-            .toList();
+    final lessonsToShow = _lessons.take(_visibleLessonCount).toList();
+    final hasMoreLessons = _visibleLessonCount < _lessons.length;
 
     return Scaffold(
       appBar: AppBar(
@@ -63,7 +90,7 @@ class SubjectDetailPage extends StatelessWidget {
           color: Colors.black,
         ),
         title: Text(
-          chapter.title.toUpperCase(),
+          widget.chapter.title.toUpperCase(),
           style: const TextStyle(
             color: Color(0xFF582DB0),
             fontWeight: FontWeight.w900,
@@ -132,48 +159,77 @@ class SubjectDetailPage extends StatelessWidget {
                         ),
                   ),
                   const SizedBox(height: 16),
-                  ...lessons.map(
-                    (lesson) => Card(
-                      elevation: 8,
-                      shadowColor: Colors.black.withOpacity(0.15),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(color: Color(0xFF582DB0), width: 2),
+                  if (_lessons.isEmpty)
+                    const Text(
+                      'No lessons available yet.',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        leading: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF582DB0).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10),
+                    )
+                  else ...[
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: lessonsToShow.length,
+                      itemBuilder: (context, index) {
+                        final lesson = lessonsToShow[index];
+                        return Card(
+                          elevation: 8,
+                          shadowColor: Colors.black.withOpacity(0.15),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: const BorderSide(color: Color(0xFF582DB0), width: 2),
                           ),
-                          child: const Icon(Icons.play_circle_outline, color: Color(0xFF582DB0), size: 28),
-                        ),
-                        title: Text(
-                          lesson.title,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1E293B),
-                            fontSize: 16,
-                          ),
-                        ),
-                        trailing: const Icon(Icons.chevron_right, color: Color(0xFF582DB0), size: 28),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => LessonDetailPage(
-                                lessonName: lesson.title,
-                                lesson: lesson,
-                                courseTitle: courseTitle ?? chapter.title,
+                          child: ListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            leading: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF582DB0).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.play_circle_outline,
+                                  color: Color(0xFF582DB0), size: 28),
+                            ),
+                            title: Text(
+                              lesson.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1E293B),
+                                fontSize: 16,
                               ),
                             ),
-                          );
-                        },
-                      ),
+                            trailing:
+                                const Icon(Icons.chevron_right, color: Color(0xFF582DB0), size: 28),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => LessonDetailPage(
+                                    lessonName: lesson.title,
+                                    lesson: lesson,
+                                    courseTitle: widget.courseTitle ?? widget.chapter.title,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
                     ),
-                  ),
+                    if (hasMoreLessons)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: _loadMoreLessons,
+                          icon: const Icon(Icons.expand_more),
+                          label: const Text('Load more lessons'),
+                        ),
+                      ),
+                  ],
                 ],
               ),
             ),
@@ -187,8 +243,8 @@ class SubjectDetailPage extends StatelessWidget {
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => QuestionBankPage(
-                      chapter: chapter,
-                      courseTitle: courseTitle ?? chapter.title,
+                      chapter: widget.chapter,
+                      courseTitle: widget.courseTitle ?? widget.chapter.title,
                     ),
                   ),
                 );

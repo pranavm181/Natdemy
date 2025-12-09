@@ -484,22 +484,26 @@ class JoinedCourses {
       }
     }
 
-    // Load from API (either force refresh or no cache available)
-    int retries = 3;
-    for (int i = 0; i < retries; i++) {
-      try {
-        if (i > 0) {
-          await Future.delayed(Duration(milliseconds: 100 * i));
-        }
-
+      // Load from API (either force refresh or no cache available)
+      int retries = 3;
+      for (int i = 0; i < retries; i++) {
         try {
-          final apiCourses = await _loadCoursesFromAPI();
-          _joined
-            ..clear()
-            ..addAll(apiCourses);
-          debugPrint('✅ Loaded ${_joined.length} course(s) from API for $_currentEmail');
-          await _saveCourses();
-          return;
+          if (i > 0) {
+            await Future.delayed(Duration(milliseconds: 100 * i));
+          }
+
+          try {
+            final apiCourses = await _loadCoursesFromAPI();
+            _joined
+              ..clear()
+              ..addAll(apiCourses);
+            debugPrint('✅ Loaded ${_joined.length} course(s) from API for $_currentEmail');
+            
+            // Load full stream data (chapters, lessons, materials, MCQs) for all enrolled courses
+            await _loadFullStreamDataForEnrolledCourses();
+            
+            await _saveCourses();
+            return;
         } catch (e) {
           debugPrint('⚠️ Failed to load from API: $e');
           if (forceRefresh) {
@@ -530,6 +534,13 @@ class JoinedCourses {
     } catch (e) {
       debugPrint('⚠️ Error clearing cache: $e');
     }
+  }
+
+  // Public method to clear cache
+  Future<void> clearCache() async {
+    await _clearCache();
+    _joined.clear();
+    debugPrint('🗑️ Cleared cache and in-memory data');
   }
   
   // Load courses from API
@@ -1234,6 +1245,29 @@ class JoinedCourses {
       debugPrint('   Stack trace: $stackTrace');
       return [];
     }
+  }
+
+  // Load full stream data (chapters, lessons, materials, MCQs) for all enrolled courses
+  Future<void> _loadFullStreamDataForEnrolledCourses() async {
+    if (_currentEmail == null) return;
+    
+    debugPrint('📚 Loading full stream data for enrolled courses...');
+    
+    // Load chapters for all enrolled courses
+    // loadChaptersForCourse already updates the course internally
+    for (final course in _joined) {
+      if (course.isEnrolled && course.courseId != null && course.streamId != null) {
+        try {
+          debugPrint('📖 Loading chapters for course ${course.courseId}, stream ${course.streamId}');
+          await loadChaptersForCourse(course.courseId!, course.streamId!);
+          debugPrint('✅ Loaded chapters for course "${course.title}"');
+        } catch (e) {
+          debugPrint('⚠️ Error loading chapters for course ${course.courseId}: $e');
+        }
+      }
+    }
+    
+    debugPrint('✅ Finished loading full stream data');
   }
 
   Future<void> _saveCourses() async {

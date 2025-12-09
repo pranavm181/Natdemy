@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../data/joined_courses.dart';
 import '../data/lessons_config.dart';
 import '../data/student.dart';
@@ -38,8 +39,30 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   void initState() {
     super.initState();
     _coursesScrollController.addListener(_handleCoursesScroll);
-    // Load from cache first for instant display, then refresh in background
-    _loadCourses(forceRefresh: false);
+    // Check if app was restarted - if so, clear cache and load fresh
+    _checkAppRestartAndLoad();
+  }
+
+  Future<void> _checkAppRestartAndLoad() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final appRestarted = prefs.getBool('app_restarted') ?? false;
+      
+      if (appRestarted) {
+        // App was restarted - clear cache and load fresh
+        debugPrint('🔄 App restarted detected - clearing cache and loading fresh data');
+        await prefs.setBool('app_restarted', false); // Reset flag
+        await JoinedCourses.instance.clearCache();
+        _loadCourses(forceRefresh: true);
+      } else {
+        // Normal navigation - load from cache first
+        _loadCourses(forceRefresh: false);
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error checking app restart: $e');
+      // Fallback to normal load
+      _loadCourses(forceRefresh: false);
+    }
   }
 
   @override
@@ -52,22 +75,12 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Only refresh in background if we haven't loaded yet or it's been a while
-    // Don't block UI - use cache first, refresh in background
-    final now = DateTime.now();
-    final shouldRefreshInBackground = !_hasLoadedOnce || 
-                        _lastLoadTime == null || 
-                        now.difference(_lastLoadTime!).inSeconds > 30; // Only refresh after 30 seconds
-    
-    if (shouldRefreshInBackground) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          // Refresh in background without blocking UI
-          _loadCourses(forceRefresh: true).catchError((e) {
-            debugPrint('Background refresh error: $e');
-          });
-        }
-      });
+    // When navigating from other pages, use cache - don't refresh
+    // Only refresh if we haven't loaded yet (handled in initState)
+    // This ensures cache is used when navigating between pages
+    if (!_hasLoadedOnce && JoinedCourses.instance.all.isNotEmpty) {
+      // We have cache but haven't loaded yet - load from cache
+      _loadCourses(forceRefresh: false);
     }
   }
 
@@ -377,13 +390,21 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Color(0xFF582DB0)),
-            onPressed: () => _loadCourses(forceRefresh: true),
+            onPressed: () async {
+              // Clear cache and load fresh when refresh button is pressed
+              await JoinedCourses.instance.clearCache();
+              _loadCourses(forceRefresh: true);
+            },
             tooltip: 'Refresh courses',
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () => _loadCourses(forceRefresh: true),
+        onRefresh: () async {
+          // Clear cache and load fresh when pull-to-refresh
+          await JoinedCourses.instance.clearCache();
+          await _loadCourses(forceRefresh: true);
+        },
         child: joined.isEmpty
             ? ListView(
                 controller: _coursesScrollController,

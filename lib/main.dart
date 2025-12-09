@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Mark app as restarted for cache clearing
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool('app_restarted', true);
+  await prefs.setString('app_last_run', DateTime.now().toIso8601String());
+  
   runApp(const MyApp());
 }
 

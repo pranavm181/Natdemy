@@ -197,11 +197,19 @@ class StudentService {
       debugPrint('🔄 Fetching enrolled courses for: $email');
       int? targetStudentId;
 
+      // Try to resolve student ID first - this helps with matching enrollments
       try {
         final student = await fetchStudentByEmail(email);
-        targetStudentId = student?.id;
-      } catch (e) {
+        if (student != null) {
+          targetStudentId = student.id;
+          debugPrint('✅ Resolved student ID: $targetStudentId for email: $email');
+        } else {
+          debugPrint('⚠️ Student not found for email: $email - will try to match enrollments by email only');
+        }
+      } catch (e, stackTrace) {
         debugPrint('⚠️ Unable to resolve student ID for $email: $e');
+        debugPrint('   Stack trace: $stackTrace');
+        // Continue anyway - we can still match by email
       }
       
       // Try home API endpoint first (has enrollments with chapters/lessons)
@@ -281,6 +289,19 @@ class StudentService {
     
     debugPrint('🔍 Parsing ${enrollments.length} enrollment(s) for email: $email (ID: $studentId)');
 
+    // If we don't have studentId yet, try to fetch it
+    if (studentId == null) {
+      try {
+        final student = await fetchStudentByEmail(email);
+        if (student != null) {
+          studentId = student.id;
+          debugPrint('✅ Resolved student ID: $studentId for email: $email');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Could not resolve student ID for $email: $e');
+      }
+    }
+
     for (final enrollment in enrollments) {
       if (enrollment is! Map<String, dynamic>) continue;
 
@@ -289,12 +310,14 @@ class StudentService {
       String? studentEmail;
       int? enrollmentStudentId;
       
-      // Debug: Log raw enrollment structure
-      debugPrint('   Raw enrollment keys: ${enrollment.keys.toList()}');
-      if (studentData != null) {
-        debugPrint('   Student data type: ${studentData.runtimeType}');
-        if (studentData is Map<String, dynamic>) {
-          debugPrint('   Student data keys: ${studentData.keys.toList()}');
+      // Debug: Log raw enrollment structure (only for first few enrollments to avoid spam)
+      if (enrollments.indexOf(enrollment) < 3) {
+        debugPrint('   Raw enrollment keys: ${enrollment.keys.toList()}');
+        if (studentData != null) {
+          debugPrint('   Student data type: ${studentData.runtimeType}');
+          if (studentData is Map<String, dynamic>) {
+            debugPrint('   Student data keys: ${studentData.keys.toList()}');
+          }
         }
       }
       
@@ -312,7 +335,9 @@ class StudentService {
       } else if (studentData is int || studentData is String) {
         // Student data might just be an ID reference
         enrollmentStudentId = _asDouble(studentData)?.toInt();
-        debugPrint('   Student data is ID reference: $enrollmentStudentId');
+        if (enrollments.indexOf(enrollment) < 3) {
+          debugPrint('   Student data is ID reference: $enrollmentStudentId');
+        }
       }
       
       // Fallback to direct fields
@@ -332,12 +357,17 @@ class StudentService {
         }
       }
       
-      // Debug: Log enrollment details
-      debugPrint('   Enrollment: studentEmail=$studentEmail, enrollmentStudentId=$enrollmentStudentId, targetEmail=$normalizedEmail, targetId=$studentId');
+      // Normalize email for comparison
+      final normalizedEnrollmentEmail = studentEmail?.toLowerCase().trim();
+      
+      // Debug: Log enrollment details (only for first few enrollments)
+      if (enrollments.indexOf(enrollment) < 3) {
+        debugPrint('   Enrollment: studentEmail=$studentEmail, enrollmentStudentId=$enrollmentStudentId, targetEmail=$normalizedEmail, targetId=$studentId');
+      }
 
-      // Match by email first (most reliable)
+      // Match by email first (most reliable) - use normalized comparison
       bool matches = false;
-      if (studentEmail != null && studentEmail.toLowerCase().trim() == normalizedEmail) {
+      if (normalizedEnrollmentEmail != null && normalizedEnrollmentEmail == normalizedEmail) {
         matches = true;
         debugPrint('   ✅ Matched by email: $studentEmail');
       }
@@ -348,9 +378,30 @@ class StudentService {
         debugPrint('   ✅ Matched by student ID: $enrollmentStudentId');
       }
       
+      // Additional fallback: if email is very similar (handles minor variations)
+      if (!matches && normalizedEnrollmentEmail != null) {
+        // Check if emails are similar (handles cases where one might have extra spaces or slight differences)
+        final enrollmentEmailParts = normalizedEnrollmentEmail.split('@');
+        final targetEmailParts = normalizedEmail.split('@');
+        if (enrollmentEmailParts.length == 2 && targetEmailParts.length == 2) {
+          // Compare local parts (before @) and domain parts separately
+          final enrollmentLocal = enrollmentEmailParts[0].replaceAll(RegExp(r'[._-]'), '');
+          final targetLocal = targetEmailParts[0].replaceAll(RegExp(r'[._-]'), '');
+          final enrollmentDomain = enrollmentEmailParts[1].toLowerCase();
+          final targetDomain = targetEmailParts[1].toLowerCase();
+          
+          if (enrollmentLocal == targetLocal && enrollmentDomain == targetDomain) {
+            matches = true;
+            debugPrint('   ✅ Matched by similar email: $studentEmail (normalized comparison)');
+          }
+        }
+      }
+      
       // If no match, skip this enrollment
       if (!matches) {
-        debugPrint('   ⏭️ Skipping enrollment - no match');
+        if (enrollments.indexOf(enrollment) < 3) {
+          debugPrint('   ⏭️ Skipping enrollment - no match (enrollmentEmail=$normalizedEnrollmentEmail, enrollmentId=$enrollmentStudentId)');
+        }
         continue;
       }
 
@@ -468,12 +519,17 @@ class StudentService {
       );
 
       joinedCourses.add(joinedCourse);
+      debugPrint('   ✅ Added course: ${course.title} (ID: ${course.id}, Stream: $streamName)');
     }
 
     if (joinedCourses.isEmpty) {
-      debugPrint('ℹ️ No enrollments found for $email');
+      debugPrint('⚠️ No enrollments matched for $email out of ${enrollments.length} total enrollment(s)');
+      debugPrint('   This might indicate:');
+      debugPrint('   - Email mismatch between enrollment and student record');
+      debugPrint('   - Student ID mismatch');
+      debugPrint('   - Enrollment data structure issues');
     } else {
-      debugPrint('✅ Loaded ${joinedCourses.length} enrollment(s) for $email');
+      debugPrint('✅ Loaded ${joinedCourses.length} enrollment(s) for $email (out of ${enrollments.length} total)');
     }
 
     return joinedCourses;

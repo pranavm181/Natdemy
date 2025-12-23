@@ -5,7 +5,7 @@ import '../data/student.dart';
 import '../data/joined_courses.dart';
 import '../data/auth_helper.dart';
 import '../api/student_service.dart';
-import '../api/course_service.dart';
+import '../api/banner_service.dart';
 import 'home.dart';
 import 'loginscreen.dart';
 import 'onboarding_screen.dart';
@@ -79,8 +79,8 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkLoginStatus() async {
-    // Initialize cache in parallel with animation
-    final cacheInit = CourseService.initializeCache();
+    // Initialize banner cache only (courses will load when needed)
+    final cacheInit = BannerService.initializeCache();
     
     // Wait for animation to complete (reduced from 2000ms to 1200ms for faster loading)
     await Future.delayed(const Duration(milliseconds: 1200));
@@ -113,24 +113,16 @@ class _SplashScreenState extends State<SplashScreen>
           ),
         );
         
-        // Load API data and courses in background (non-blocking)
-        Future.wait([
-          // Fetch student data from API
-          StudentService.fetchStudentByEmail(savedEmail).then((apiStudent) {
-            if (apiStudent != null) {
-              AuthHelper.saveLoginData(apiStudent).catchError((e) {
-                debugPrint('Error saving login data: $e');
-              });
-            }
-          }).catchError((e) {
-            debugPrint('Error fetching student data from API: $e');
-          }),
-          // Load courses in background (will use cache if available)
-          JoinedCourses.instance.initialize(savedEmail).catchError((e) {
-            debugPrint('Error loading courses: $e');
-          }),
-        ]).catchError((e) {
-          debugPrint('Error in background loading: $e');
+        // Load student data from API in background (non-blocking)
+        // Courses will be loaded only when My Courses page is opened
+        StudentService.fetchStudentByEmail(savedEmail).then((apiStudent) {
+          if (apiStudent != null) {
+            AuthHelper.saveLoginData(apiStudent).catchError((e) {
+              debugPrint('Error saving login data: $e');
+            });
+          }
+        }).catchError((e) {
+          debugPrint('Error fetching student data from API: $e');
         });
       } else {
         // User not logged in, show onboarding

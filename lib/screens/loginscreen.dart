@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../data/joined_courses.dart';
 import '../data/auth_helper.dart';
 import '../api/auth_service.dart';
 import '../widgets/theme_loading_indicator.dart';
@@ -37,7 +36,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       await AuthHelper.saveLoginData(authResult.student, token: authResult.token);
 
-      await JoinedCourses.instance.initialize(authResult.student.email);
+      // Courses will be loaded only when My Courses page is opened
+      // This speeds up login significantly
 
       if (!mounted) return;
 

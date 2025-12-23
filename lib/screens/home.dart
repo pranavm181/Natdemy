@@ -1,12 +1,16 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:provider/provider.dart';
 import '../data/student.dart';
+import '../providers/student_provider.dart';
+import '../providers/courses_provider.dart';
+import '../providers/banners_provider.dart';
+import '../providers/testimonials_provider.dart';
 import '../data/course_catalog.dart';
 import '../data/course_stream.dart';
 import '../data/joined_courses.dart';
@@ -18,11 +22,11 @@ import '../widgets/rating_stars.dart';
 import '../widgets/main_drawer.dart';
 import '../widgets/theme_loading_indicator.dart';
 import '../utils/animations.dart';
+import '../utils/haptic_feedback.dart';
+import '../widgets/fade_in_content.dart';
 import '../api/course_service.dart';
 import '../api/contact_service.dart';
 import '../api/student_service.dart';
-import '../api/testimonial_service.dart';
-import '../api/banner_service.dart';
 import '../data/testimonial.dart';
 import '../data/banner.dart';
 import '../widgets/banner_carousel.dart';
@@ -52,18 +56,8 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     _currentStudent = widget.student;
-    _initializeCourses();
-  }
-
-  Future<void> _initializeCourses() async {
-    // Remove delay - not needed, platform channels are ready by initState
-    // Parallelize API calls for better performance
-    await Future.wait([
-      // Load courses in background
-      JoinedCourses.instance.initialize(_currentStudent.email),
-      // Refresh student data in parallel
-      _refreshStudentDataInBackground(),
-    ]);
+    // Only refresh student data - courses will load when My Courses page is opened
+    _refreshStudentDataInBackground();
     
     if (mounted) {
       setState(() {
@@ -491,6 +485,7 @@ class _HomeShellState extends State<HomeShell> {
                   selectedIndex: _currentIndex,
                   onTabChange: (index) {
                     // Just change the tab - let MyCoursesScreen handle its own loading
+                    HapticUtils.subtleTap();
                     setState(() => _currentIndex = index);
                   },
                 ),
@@ -619,24 +614,17 @@ class _NatdemyLogoPainter extends CustomPainter {
 }
 
 class HomeTab extends StatefulWidget {
-  const HomeTab({super.key, required this.student});
+  const HomeTab({super.key, this.student});
 
-  final Student student;
+  final Student? student; // Optional - can use Provider instead
 
   @override
   State<HomeTab> createState() => _HomeTabState();
 }
 
 class _HomeTabState extends State<HomeTab> {
-  List<Course> _courses = [];
-  bool _isLoading = true;
-  String? _errorMessage;
   ContactInfo _contactInfo = ContactInfo.getDefault();
   bool _isLoadingContact = true;
-  List<Testimonial> _testimonials = [];
-  bool _isLoadingTestimonials = true;
-  List<AppBanner> _banners = [];
-  bool _isLoadingBanners = true;
   late final PageController _testimonialPageController;
   int _currentTestimonialIndex = 0;
   static const int _bannerPageChunk = 3;
@@ -660,65 +648,73 @@ class _HomeTabState extends State<HomeTab> {
     Testimonial testimonial,
     BuildContext context,
   ) {
-    final double textWidth = _calculateTestimonialTextWidth(cardWidth);
+    // Updated calculation for new neat design
+    final double textWidth = cardWidth - (kIsWeb ? 56 : 40); // Account for padding
     final textStyle = TextStyle(
-      fontSize: kIsWeb ? 14.5 : 12.5,
-      color: Colors.grey[800],
-      height: 1.45,
+      fontSize: kIsWeb ? 15.5 : 14,
+      color: const Color(0xFF1E293B),
+      height: 1.6,
       fontWeight: FontWeight.w400,
-      letterSpacing: 0.2,
+      letterSpacing: 0.1,
     );
     final textPainter = TextPainter(
       text: TextSpan(text: testimonial.content.trim(), style: textStyle),
       textDirection: TextDirection.ltr,
+      maxLines: 6,
     )..layout(maxWidth: textWidth);
 
-    final double quotePadding = kIsWeb ? 8 : 6;
-    final double quoteIconSize = kIsWeb ? 24 : 20;
-    final double quoteHeight = (quotePadding * 2) + quoteIconSize;
-
-    final double verticalPadding = (kIsWeb ? 14 : 10) * 2;
-    final double headerHeight = math.max(kIsWeb ? 36 : 32, (kIsWeb ? 18 : 16) * 2);
-    const double spacingAfterHeader = 16;
-    final double textBlockHeight = math.max(textPainter.height, quoteHeight);
-    final double spacingBelowText = kIsWeb ? 22 : 18;
+    // New design components
+    final double verticalPadding = (kIsWeb ? 28 : 20) * 2; // Top and bottom padding
+    final double topSectionHeight = kIsWeb ? 44 : 40; // Quote icon + rating row
+    const double spacingAfterTop = 20;
+    final double textBlockHeight = textPainter.height;
+    const double spacingAfterText = 20;
+    const double dividerHeight = 1;
+    const double spacingAfterDivider = 16;
+    final double authorSectionHeight = kIsWeb ? 56 : 48; // Profile + name section
 
     final double totalHeight = verticalPadding +
-        headerHeight +
-        spacingAfterHeader +
+        topSectionHeight +
+        spacingAfterTop +
         textBlockHeight +
-        spacingBelowText +
-        (kIsWeb ? 36 : 28);
+        spacingAfterText +
+        dividerHeight +
+        spacingAfterDivider +
+        authorSectionHeight;
 
-    final double minHeight = kIsWeb ? 260.0 : 230.0;
-    final double maxHeight = MediaQuery.of(context).size.height * (kIsWeb ? 0.85 : 0.9);
+    final double minHeight = kIsWeb ? 280.0 : 260.0;
+    final double maxHeight = MediaQuery.of(context).size.height * (kIsWeb ? 0.75 : 0.7);
 
     return totalHeight.clamp(minHeight, maxHeight);
   }
 
-  List<AppBanner> get _displayedBanners {
-    if (_banners.isEmpty || _visibleBannerCount <= 0 || _visibleBannerCount >= _banners.length) {
-      return _banners;
+  List<AppBanner> _getDisplayedBanners(BannersProvider bannersProvider) {
+    final banners = bannersProvider.banners;
+    if (banners.isEmpty || _visibleBannerCount <= 0 || _visibleBannerCount >= banners.length) {
+      return banners;
     }
-    return _banners.take(_visibleBannerCount).toList();
+    return banners.take(_visibleBannerCount).toList();
   }
 
-  List<Testimonial> get _displayedTestimonials {
-    if (_testimonials.isEmpty ||
+  List<Testimonial> _getDisplayedTestimonials(TestimonialsProvider testimonialsProvider) {
+    final testimonials = testimonialsProvider.testimonials;
+    if (testimonials.isEmpty ||
         _visibleTestimonialCount <= 0 ||
-        _visibleTestimonialCount >= _testimonials.length) {
-      return _testimonials;
+        _visibleTestimonialCount >= testimonials.length) {
+      return testimonials;
     }
-    return _testimonials.take(_visibleTestimonialCount).toList();
+    return testimonials.take(_visibleTestimonialCount).toList();
   }
 
-  void _resetBannerPagination() {
-    _visibleBannerCount = _banners.isEmpty ? 0 : math.min(_bannerPageChunk, _banners.length);
+  void _resetBannerPagination(BannersProvider bannersProvider) {
+    final banners = bannersProvider.banners;
+    _visibleBannerCount = banners.isEmpty ? 0 : math.min(_bannerPageChunk, banners.length);
   }
 
-  void _resetTestimonialPagination() {
+  void _resetTestimonialPagination(TestimonialsProvider testimonialsProvider) {
+    final testimonials = testimonialsProvider.testimonials;
     _visibleTestimonialCount =
-        _testimonials.isEmpty ? 0 : math.min(_testimonialPageChunk, _testimonials.length);
+        testimonials.isEmpty ? 0 : math.min(_testimonialPageChunk, testimonials.length);
     _currentTestimonialIndex = 0;
     if (_testimonialPageController.hasClients && _visibleTestimonialCount > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -729,43 +725,47 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
 
-  void _loadMoreBannersChunk() {
-    if (_banners.isEmpty) return;
-    if (_visibleBannerCount >= _banners.length) return;
+  void _loadMoreBannersChunk(BannersProvider bannersProvider) {
+    final banners = bannersProvider.banners;
+    if (banners.isEmpty) return;
+    if (_visibleBannerCount >= banners.length) return;
     setState(() {
       _visibleBannerCount =
-          math.min(_visibleBannerCount + _bannerPageChunk, _banners.length);
+          math.min(_visibleBannerCount + _bannerPageChunk, banners.length);
     });
   }
 
-  void _loadMoreTestimonialsChunk() {
-    if (_testimonials.isEmpty) return;
-    if (_visibleTestimonialCount >= _testimonials.length) return;
+  void _loadMoreTestimonialsChunk(TestimonialsProvider testimonialsProvider) {
+    final testimonials = testimonialsProvider.testimonials;
+    if (testimonials.isEmpty) return;
+    if (_visibleTestimonialCount >= testimonials.length) return;
     setState(() {
       _visibleTestimonialCount = math.min(
         _visibleTestimonialCount + _testimonialPageChunk,
-        _testimonials.length,
+        testimonials.length,
       );
     });
   }
 
-  void _handleBannerPageChanged(int index) {
-    if (_visibleBannerCount < _banners.length) {
+  void _handleBannerPageChanged(int index, BannersProvider bannersProvider) {
+    final banners = bannersProvider.banners;
+    if (_visibleBannerCount < banners.length) {
       final threshold = math.max(0, _visibleBannerCount - 2);
       if (index >= threshold) {
-        _loadMoreBannersChunk();
+        _loadMoreBannersChunk(bannersProvider);
       }
     }
   }
 
-  void _handleTestimonialPageChanged(int index) {
+  void _handleTestimonialPageChanged(int index, TestimonialsProvider testimonialsProvider) {
     setState(() {
       _currentTestimonialIndex = index;
     });
-    if (_visibleTestimonialCount < _testimonials.length) {
+    final testimonials = testimonialsProvider.testimonials;
+    if (_visibleTestimonialCount < testimonials.length) {
       final threshold = math.max(0, _visibleTestimonialCount - 2);
       if (index >= threshold) {
-        _loadMoreTestimonialsChunk();
+        _loadMoreTestimonialsChunk(testimonialsProvider);
       }
     }
   }
@@ -774,11 +774,28 @@ class _HomeTabState extends State<HomeTab> {
   void initState() {
     super.initState();
     _testimonialPageController = PageController();
-    // Load all data in parallel for better performance
-    _loadCourses();
-    _loadContactInfo();
-    _loadTestimonials();
-    _loadBanners();
+    // Initialize providers and load only banners and testimonials (not courses)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final bannersProvider = Provider.of<BannersProvider>(context, listen: false);
+      final testimonialsProvider = Provider.of<TestimonialsProvider>(context, listen: false);
+      
+      // Load banners first (from cache - instant), then testimonials
+      bannersProvider.fetchBanners().then((_) {
+        if (mounted) {
+          _resetBannerPagination(bannersProvider);
+        }
+      });
+      
+      // Load testimonials and contact info in parallel
+      Future.wait([
+        testimonialsProvider.fetchTestimonials(),
+        _loadContactInfo(),
+      ]).then((_) {
+        if (mounted) {
+          _resetTestimonialPagination(testimonialsProvider);
+        }
+      });
+    });
   }
 
   Future<void> _loadContactInfo() async {
@@ -795,113 +812,6 @@ class _HomeTabState extends State<HomeTab> {
       if (mounted) {
         setState(() {
           _isLoadingContact = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _loadTestimonials() async {
-    try {
-      // Load from cache first (fast), then refresh from API in background
-      final testimonials = await TestimonialService.fetchTestimonials(forceRefresh: false);
-      
-      if (mounted) {
-        setState(() {
-          _testimonials = testimonials;
-          _isLoadingTestimonials = false;
-          _resetTestimonialPagination();
-        });
-      }
-      
-      // Refresh from API in background (non-blocking)
-      TestimonialService.fetchTestimonials(forceRefresh: true).then((updatedTestimonials) {
-        if (mounted) {
-          setState(() {
-            _testimonials = updatedTestimonials;
-            _resetTestimonialPagination();
-          });
-        }
-      }).catchError((e) {
-        debugPrint('⚠️ Background testimonials refresh failed: $e');
-      });
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error loading testimonials: $e');
-      debugPrint('   Stack trace: $stackTrace');
-      if (mounted) {
-        setState(() {
-          _isLoadingTestimonials = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _loadBanners({bool forceNetwork = false}) async {
-    try {
-      if (!forceNetwork && _banners.isNotEmpty) {
-        debugPrint('📦 Using cached banners (count: ${_banners.length})');
-      }
-      final banners = await BannerService.fetchBanners();
-      if (mounted) {
-        setState(() {
-          _banners = banners;
-          _isLoadingBanners = false;
-          _resetBannerPagination();
-        });
-      }
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error loading banners: $e');
-      debugPrint('   Stack trace: $stackTrace');
-      if (mounted) {
-        setState(() {
-          _isLoadingBanners = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _loadCourses({bool forceNetwork = false}) async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // Load courses: hit API directly when explicitly refreshed, else load cached first
-      final courses = await CourseService.fetchCourses(forceRefresh: forceNetwork);
-      
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _courses = courses;
-          if (courses.isEmpty) {
-            _errorMessage = 'No courses available.';
-          } else {
-            _errorMessage = null;
-            debugPrint('✅ Displaying ${courses.length} courses');
-          }
-        });
-      }
-      
-      if (!forceNetwork) {
-        // Refresh from API in background (non-blocking)
-        CourseService.fetchCourses(forceRefresh: true).then((updatedCourses) {
-          if (mounted && updatedCourses.isNotEmpty) {
-            setState(() {
-              _courses = updatedCourses;
-            });
-          }
-        }).catchError((e) {
-          debugPrint('⚠️ Background refresh failed: $e');
-        });
-      }
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error loading courses in UI: $e');
-      debugPrint('   Stack trace: $stackTrace');
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Failed to load courses. Please try again.';
-          _isLoading = false;
-          _courses = [];
         });
       }
     }
@@ -1224,8 +1134,6 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final allCourses = _courses;
-    final courses = allCourses.length > 4 ? allCourses.take(4).toList() : List<Course>.from(allCourses);
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
@@ -1364,16 +1272,25 @@ class _HomeTabState extends State<HomeTab> {
                   kIsWeb ? Responsive.getHorizontalPadding(context) : 16,
                   kIsWeb ? 32 : 16,
                 ),
-                child: Builder(
-                  builder: (context) {
-                    final bannerList = _displayedBanners;
-                    if (_isLoadingBanners || bannerList.isEmpty) {
+                child: Consumer<BannersProvider>(
+                  builder: (context, bannersProvider, child) {
+                    final bannerList = _getDisplayedBanners(bannersProvider);
+                    if (bannersProvider.isLoading || bannerList.isEmpty) {
                       return _buildBannerPlaceholder(context);
                     }
-                    return BannerCarousel(
-                      banners: bannerList,
-                      student: widget.student,
-                      onPageChanged: _handleBannerPageChanged,
+                    return FadeInContent(
+                      delay: const Duration(milliseconds: 100),
+                      child: Consumer<StudentProvider>(
+                        builder: (context, studentProvider, child) {
+                          return BannerCarousel(
+                            useProvider: true,
+                            onPageChanged: (index) {
+                              HapticUtils.subtleTap();
+                              _handleBannerPageChanged(index, bannersProvider);
+                            },
+                          );
+                        },
+                      ),
                     );
                   },
                 ),
@@ -1404,21 +1321,30 @@ class _HomeTabState extends State<HomeTab> {
                     ),
                     Row(
                       children: [
-                        if (_isLoading)
-                          const Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: ThemePulsingDotsIndicator(size: 8.0, spacing: 8.0),
-                          )
-                        else if (_errorMessage == null)
-                          IconButton(
-                            icon: const Icon(Icons.refresh, size: 20),
-                            onPressed: _refreshAllHomeData,
-                            tooltip: 'Refresh home data',
-                          ),
+                        Consumer<CoursesProvider>(
+                          builder: (context, coursesProvider, child) {
+                            if (coursesProvider.isLoading)
+                              return const Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: ThemePulsingDotsIndicator(size: 8.0, spacing: 8.0),
+                              );
+                            else
+                              return IconButton(
+                                icon: const Icon(Icons.refresh, size: 20),
+                                onPressed: () {
+                                  coursesProvider.fetchCourses(forceRefresh: true);
+                                  Provider.of<BannersProvider>(context, listen: false).fetchBanners();
+                                  Provider.of<TestimonialsProvider>(context, listen: false).fetchTestimonials(forceRefresh: true);
+                                },
+                                tooltip: 'Refresh home data',
+                              );
+                          },
+                        ),
                         TextButton(
                           onPressed: () {
+                            HapticUtils.navigationTap();
                             Navigator.of(context).push(
-                              SlidePageRoute(
+                              BouncePageRoute(
                                 builder: (_) => const AllCoursesPage(),
                                 direction: SlideDirection.right,
                               ),
@@ -1442,86 +1368,101 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ),
 
-        // Error Message
-        if (_errorMessage != null)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Card(
-                color: Colors.orange.shade50,
+        // Courses Grid (lazy loaded - only when home tab is viewed)
+        Consumer<CoursesProvider>(
+          builder: (context, coursesProvider, child) {
+            // Load courses lazily when this widget is first built
+            if (!coursesProvider.hasCourses && !coursesProvider.isLoading) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                coursesProvider.fetchCourses();
+              });
+            }
+            
+            final allCourses = coursesProvider.courses;
+            final courses = allCourses.length > 4 ? allCourses.take(4).toList() : List<Course>.from(allCourses);
+            
+            if (coursesProvider.isLoading && courses.isEmpty)
+              return const SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: TextStyle(color: Colors.orange.shade900, fontSize: 14),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => _loadCourses(forceNetwork: true),
-                        child: const Text('Retry'),
-                      ),
-                    ],
+                  padding: EdgeInsets.all(32),
+                  child: Center(
+                    child: ThemePulsingDotsIndicator(size: 12.0, spacing: 16.0),
                   ),
                 ),
-              ),
-            ),
-          ),
-
-        // Courses Grid
-        if (_isLoading && courses.isEmpty)
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(32),
-              child: Center(
-                child: ThemePulsingDotsIndicator(size: 12.0, spacing: 16.0),
-              ),
-            ),
-          )
-        else if (courses.isEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(Icons.school_outlined, size: 64, color: Colors.grey[400]),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No courses available',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 16),
+              );
+            else if (coursesProvider.error != null && courses.isEmpty)
+              return SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Card(
+                    color: Colors.orange.shade50,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              coursesProvider.error!,
+                              style: TextStyle(color: Colors.orange.shade900, fontSize: 14),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => coursesProvider.fetchCourses(forceRefresh: true),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          )
-        else
-          SliverPadding(
-            padding: EdgeInsets.symmetric(horizontal: Responsive.getHorizontalPadding(context)),
-            sliver: SliverGrid(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: Responsive.getGridColumns(context),
-                mainAxisSpacing: Responsive.getCardSpacing(context),
-                crossAxisSpacing: Responsive.getCardSpacing(context),
-                childAspectRatio: kIsWeb ? 0.65 : 1.0,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (BuildContext context, int index) {
-                  final c = courses[index];
-                  return AnimatedListItem(
-                    index: index,
-                    child: _CourseCard(course: c),
-                  );
-                },
-                childCount: courses.length,
-              ),
-            ),
-          ),
+              );
+            else if (courses.isEmpty)
+              return SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.school_outlined, size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No courses available',
+                          style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            else
+              return SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: Responsive.getHorizontalPadding(context)),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: Responsive.getGridColumns(context),
+                    mainAxisSpacing: Responsive.getCardSpacing(context),
+                    crossAxisSpacing: Responsive.getCardSpacing(context),
+                    childAspectRatio: kIsWeb ? 0.65 : 1.0,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (BuildContext context, int index) {
+                      final c = courses[index];
+                      return FadeInContent(
+                        delay: Duration(milliseconds: 100 + (index * 50)),
+                        child: AnimatedListItem(
+                          index: index,
+                          child: _CourseCard(course: c),
+                        ),
+                      );
+                    },
+                    childCount: courses.length,
+                  ),
+                ),
+              );
+          },
+        ),
 
         // Contact Section Header
         SliverToBoxAdapter(
@@ -2042,274 +1983,187 @@ class _HomeTabState extends State<HomeTab> {
                 ),
                 child: Column(
                   children: [
-                    // Section Header
+                    // Section Header - Redesigned
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
                         children: [
                           Container(
-                            width: 4,
-                            height: 32,
+                            width: 5,
+                            height: kIsWeb ? 36 : 32,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF582DB0),
-                              borderRadius: BorderRadius.circular(2),
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                              borderRadius: BorderRadius.circular(3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF582DB0).withOpacity(0.3),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Student Testimonials',
-                            style: TextStyle(
-                              fontSize: kIsWeb ? 26 : 22,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF1E293B),
-                              letterSpacing: 0.5,
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'STUDENT TESTIMONIALS',
+                                  style: TextStyle(
+                                    fontSize: kIsWeb ? 24 : 20,
+                                    fontWeight: FontWeight.w900,
+                                    color: const Color(0xFF1E293B),
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  width: 60,
+                                  height: 3,
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                                    ),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: kIsWeb ? 28 : 24),
 
-                    // Testimonials Carousel
-                    if (_isLoadingTestimonials)
-                      const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Center(
-                          child: ThemePulsingDotsIndicator(size: 12.0, spacing: 16.0),
-                        ),
-                      )
-                    else if (_testimonials.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Center(
-                          child: Column(
-                            children: [
-                              Icon(Icons.format_quote, size: 48, color: Colors.grey[400]),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No testimonials available yet',
-                                style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    else
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: kIsWeb ? 620 : 340,
+                    // Testimonials Carousel - Redesigned
+                    Consumer<TestimonialsProvider>(
+                      builder: (context, testimonialsProvider, child) {
+                        if (testimonialsProvider.isLoading)
+                          return const Padding(
+                            padding: EdgeInsets.all(32),
+                            child: Center(
+                              child: ThemePulsingDotsIndicator(size: 12.0, spacing: 16.0),
                             ),
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                final testimonialsToShow = _displayedTestimonials;
-                                if (testimonialsToShow.isEmpty) {
-                                  return const SizedBox.shrink();
-                                }
-                                final double cardWidth = constraints.maxWidth;
-                                final int safeIndex = _currentTestimonialIndex
-                                    .clamp(0, testimonialsToShow.length - 1)
-                                    .toInt();
-                                final Testimonial activeTestimonial = testimonialsToShow[safeIndex];
-                                final double cardHeight = _calculateTestimonialCardHeight(
-                                  cardWidth,
-                                  activeTestimonial,
-                                  context,
-                                );
+                          );
+                        else if (testimonialsProvider.testimonials.isEmpty)
+                          return Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Center(
+                              child: Column(
+                                children: [
+                                  Icon(Icons.format_quote, size: 48, color: Colors.grey[400]),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No testimonials available yet',
+                                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        else
+                          return FadeInContent(
+                            delay: const Duration(milliseconds: 150),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 2),
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: kIsWeb ? 700 : double.infinity,
+                                  ),
+                                  child: LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final testimonialsToShow = _getDisplayedTestimonials(testimonialsProvider);
+                                      if (testimonialsToShow.isEmpty) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      final double cardWidth = constraints.maxWidth;
+                                      final int safeIndex = _currentTestimonialIndex
+                                          .clamp(0, testimonialsToShow.length - 1)
+                                          .toInt();
+                                      final Testimonial activeTestimonial = testimonialsToShow[safeIndex];
+                                      final double cardHeight = _calculateTestimonialCardHeight(
+                                        cardWidth,
+                                        activeTestimonial,
+                                        context,
+                                      );
 
-                                return Column(
-                                  children: [
-                                    AnimatedSize(
-                                      duration: const Duration(milliseconds: 250),
-                                      curve: Curves.easeInOut,
-                                      child: SizedBox(
-                                        height: cardHeight,
-                                        child: PageView.builder(
-                                          controller: _testimonialPageController,
-                                          itemCount: testimonialsToShow.length,
-                                          onPageChanged: _handleTestimonialPageChanged,
-                                          itemBuilder: (context, index) {
-                                            final testimonial = testimonialsToShow[index];
-                                            return Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                                        child: AnimatedListItem(
-                                          index: index,
-                                          child: MouseRegion(
-                                            cursor: kIsWeb ? SystemMouseCursors.click : MouseCursor.defer,
-                                            child: AnimatedContainer(
-                                              duration: const Duration(milliseconds: 200),
-                                              decoration: BoxDecoration(
-                                                color: Colors.white,
-                                                  borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: Colors.black.withOpacity(kIsWeb ? 0.08 : 0.05),
-                                                    blurRadius: kIsWeb ? 16 : 10,
-                                                    spreadRadius: kIsWeb ? 1 : 0,
-                                                    offset: const Offset(0, 4),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: Padding(
-                                                padding: EdgeInsets.symmetric(
-                                                  horizontal: kIsWeb ? 16 : 12,
-                                                  vertical: kIsWeb ? 14 : 10,
-                                                ),
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Row(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        CircleAvatar(
-                                                          radius: kIsWeb ? 18 : 16,
-                                                          backgroundColor: const Color(0xFF582DB0),
-                                                          backgroundImage: testimonial.imageUrl != null &&
-                                                                  testimonial.imageUrl!.isNotEmpty
-                                                              ? NetworkImage(testimonial.imageUrl!)
-                                                              : null,
-                                                          child: testimonial.imageUrl == null ||
-                                                                  testimonial.imageUrl!.isEmpty
-                                                              ? Text(
-                                                                  testimonial.name.isNotEmpty
-                                                                      ? testimonial.name[0].toUpperCase()
-                                                                      : '?',
-                                                                  style: TextStyle(
-                                                                    color: Colors.white,
-                                                                    fontSize: kIsWeb ? 16 : 14,
-                                                                    fontWeight: FontWeight.bold,
-                                                                  ),
-                                                                )
-                                                              : null,
-                                                        ),
-                                                        const SizedBox(width: 10),
-                                                        Expanded(
-                                                          child: Column(
-                                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                                            children: [
-                                                              Text(
-                                                                testimonial.name,
-                                                                style: TextStyle(
-                                                                  fontSize: kIsWeb ? 15 : 13,
-                                                                  fontWeight: FontWeight.w700,
-                                                                  color: const Color(0xFF1E293B),
-                                                                ),
-                                                                maxLines: 1,
-                                                                overflow: TextOverflow.ellipsis,
-                                                              ),
-                                                              if (testimonial.department != null &&
-                                                                  testimonial.department!.isNotEmpty)
-                                                                Text(
-                                                                  testimonial.department!,
-                                                                  style: TextStyle(
-                                                                    color: Colors.grey[600],
-                                                                    fontSize: kIsWeb ? 12 : 11,
-                                                                  ),
-                                                                  maxLines: 1,
-                                                                  overflow: TextOverflow.ellipsis,
-                                                                ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                        const SizedBox(width: 6),
-                                                        SizedBox(
-                                                                width: kIsWeb ? 80 : 68,
-                                                          child: RatingStars(
-                                                            rating: testimonial.rating.toDouble(),
-                                                            starSize: kIsWeb ? 14 : 12,
-                                                            showValue: false,
-                                                            mainAxisAlignment: MainAxisAlignment.end,
-                                                          ),
-                                                        ),
-                                                      ],
+                                      return Column(
+                                        children: [
+                                          AnimatedSize(
+                                            duration: const Duration(milliseconds: 300),
+                                            curve: Curves.easeInOutCubic,
+                                            child: SizedBox(
+                                              height: cardHeight,
+                                              child: PageView.builder(
+                                                controller: _testimonialPageController,
+                                                itemCount: testimonialsToShow.length,
+                                                onPageChanged: (index) {
+                                                  HapticUtils.subtleTap();
+                                                  _handleTestimonialPageChanged(index, testimonialsProvider);
+                                                },
+                                                itemBuilder: (context, index) {
+                                                  final testimonial = testimonialsToShow[index];
+                                                  return Padding(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                    child: AnimatedListItem(
+                                                      index: index,
+                                                      child: _NeatTestimonialCard(
+                                                        testimonial: testimonial,
+                                                        isActive: index == safeIndex,
+                                                      ),
                                                     ),
-                                                    const SizedBox(height: 16),
-                                                    Row(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        Container(
-                                                          padding: EdgeInsets.all(kIsWeb ? 8 : 6),
-                                                          decoration: BoxDecoration(
-                                                            color: const Color(0xFF582DB0).withOpacity(0.1),
-                                                            borderRadius:
-                                                                BorderRadius.circular(kIsWeb ? 12 : 10),
-                                                          ),
-                                                          child: Icon(
-                                                            Icons.format_quote,
-                                                            color: const Color(0xFF582DB0),
-                                                            size: kIsWeb ? 24 : 20,
-                                                          ),
-                                                        ),
-                                                        SizedBox(width: kIsWeb ? 12 : 10),
-                                                        Expanded(
-                                                          child: Text(
-                                                                  testimonial.content.trim(),
-                                                            style: TextStyle(
-                                                              fontSize: kIsWeb ? 14.5 : 12.5,
-                                                              color: Colors.grey[800],
-                                                              height: 1.45,
-                                                              fontWeight: FontWeight.w400,
-                                                              letterSpacing: 0.2,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        SizedBox(width: kIsWeb ? 12 : 10),
-                                                        Container(
-                                                          padding: EdgeInsets.all(kIsWeb ? 8 : 6),
-                                                          decoration: BoxDecoration(
-                                                            color: const Color(0xFF582DB0).withOpacity(0.1),
-                                                            borderRadius:
-                                                                BorderRadius.circular(kIsWeb ? 12 : 10),
-                                                          ),
-                                                          child: Transform.rotate(
-                                                                  angle: math.pi,
-                                                            child: Icon(
-                                                              Icons.format_quote,
-                                                              color: const Color(0xFF582DB0),
-                                                              size: kIsWeb ? 24 : 20,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                          SizedBox(height: kIsWeb ? 22 : 18),
-                                                        ],
+                                                  );
+                                                },
                                               ),
                                             ),
                                           ),
-                                        ),
-                                      ),
-                                    );
-                                  },
+                                          const SizedBox(height: 20),
+                                          // Page indicators - improved design
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: List.generate(testimonialsToShow.length, (index) {
+                                              final isActive = index == _currentTestimonialIndex;
+                                              return AnimatedContainer(
+                                                duration: const Duration(milliseconds: 300),
+                                                curve: Curves.easeInOut,
+                                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                                height: 6,
+                                                width: isActive ? 32 : 6,
+                                                decoration: BoxDecoration(
+                                                  color: isActive 
+                                                      ? const Color(0xFF582DB0) 
+                                                      : Colors.grey[300],
+                                                  borderRadius: BorderRadius.circular(3),
+                                                  boxShadow: isActive
+                                                      ? [
+                                                          BoxShadow(
+                                                            color: const Color(0xFF582DB0).withOpacity(0.4),
+                                                            blurRadius: 8,
+                                                            spreadRadius: 1,
+                                                            offset: const Offset(0, 2),
+                                                          ),
+                                                        ]
+                                                      : null,
+                                                ),
+                                              );
+                                            }),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  ),
                                 ),
                               ),
                             ),
-                                    const SizedBox(height: 16),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: List.generate(testimonialsToShow.length, (index) {
-                                        final isActive = index == _currentTestimonialIndex;
-                                        return AnimatedContainer(
-                                          duration: const Duration(milliseconds: 200),
-                                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                                          height: 8,
-                                          width: isActive ? 24 : 8,
-                                          decoration: BoxDecoration(
-                                            color: isActive ? const Color(0xFF582DB0) : Colors.grey[300],
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                        );
-                                      }),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      )
+                          );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -2325,22 +2179,219 @@ class _HomeTabState extends State<HomeTab> {
       ],
     );
   }
-  Future<void> _refreshAllHomeData() async {
-    debugPrint('🔄 Refreshing entire home data...');
-    setState(() {
-      _isLoading = true;
-      _isLoadingContact = true;
-      _isLoadingTestimonials = true;
-      _isLoadingBanners = true;
-      _errorMessage = null;
-    });
 
+  Future<void> _refreshAllHomeData() async {
+    debugPrint('🔄 Refreshing home data (banners and testimonials)...');
+    final bannersProvider = Provider.of<BannersProvider>(context, listen: false);
+    final testimonialsProvider = Provider.of<TestimonialsProvider>(context, listen: false);
+    
     await Future.wait(<Future>[
-      _loadCourses(forceNetwork: true),
+      bannersProvider.fetchBanners(),
+      testimonialsProvider.fetchTestimonials(forceRefresh: true),
       _loadContactInfo(),
-      _loadTestimonials(),
-      _loadBanners(forceNetwork: true),
     ]);
+  }
+}
+
+// Neat Testimonial Card Widget
+class _NeatTestimonialCard extends StatelessWidget {
+  const _NeatTestimonialCard({
+    required this.testimonial,
+    this.isActive = true,
+  });
+
+  final Testimonial testimonial;
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final isWeb = kIsWeb;
+    
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(isWeb ? 24 : 20),
+        side: BorderSide(
+          color: const Color(0xFF582DB0).withOpacity(0.2),
+          width: 1.5,
+        ),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(isWeb ? 24 : 20),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white,
+              const Color(0xFFF8F5FF).withOpacity(0.5),
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF582DB0).withOpacity(0.08),
+              blurRadius: isWeb ? 20 : 16,
+              spreadRadius: 0,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(isWeb ? 28 : 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Top section with quote icon and rating
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Decorative quote icon
+                  Container(
+                    padding: EdgeInsets.all(isWeb ? 10 : 8),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(isWeb ? 14 : 12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF582DB0).withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.format_quote,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const Spacer(),
+                  // Rating stars
+                  RatingStars(
+                    rating: testimonial.rating.toDouble(),
+                    starSize: isWeb ? 16 : 14,
+                    showValue: false,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // Testimonial content
+              Expanded(
+                child: Text(
+                  testimonial.content.trim(),
+                  style: TextStyle(
+                    fontSize: isWeb ? 15.5 : 14,
+                    color: const Color(0xFF1E293B),
+                    height: 1.6,
+                    fontWeight: FontWeight.w400,
+                    letterSpacing: 0.1,
+                  ),
+                  maxLines: 6,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Divider
+              Container(
+                height: 1,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      const Color(0xFF582DB0).withOpacity(0.2),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Author info
+              Row(
+                children: [
+                  // Profile image with border
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF582DB0),
+                        width: 2.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF582DB0).withOpacity(0.2),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: CircleAvatar(
+                      radius: isWeb ? 24 : 20,
+                      backgroundColor: const Color(0xFF582DB0),
+                      backgroundImage: testimonial.imageUrl != null &&
+                              testimonial.imageUrl!.isNotEmpty
+                          ? NetworkImage(testimonial.imageUrl!)
+                          : null,
+                      child: testimonial.imageUrl == null ||
+                              testimonial.imageUrl!.isEmpty
+                          ? Text(
+                              testimonial.name.isNotEmpty
+                                  ? testimonial.name[0].toUpperCase()
+                                  : '?',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: isWeb ? 18 : 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Name and department
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          testimonial.name,
+                          style: TextStyle(
+                            fontSize: isWeb ? 16 : 14,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1E293B),
+                            letterSpacing: 0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (testimonial.department != null &&
+                            testimonial.department!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            testimonial.department!,
+                            style: TextStyle(
+                              fontSize: isWeb ? 13 : 12,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -2361,8 +2412,9 @@ class _CourseCard extends StatelessWidget {
       ),
       child: InkWell(
         onTap: () {
+          HapticUtils.navigationTap();
           Navigator.of(context).push(
-            SlidePageRoute(
+            BouncePageRoute(
               builder: (_) => CourseDetailPage(course: course),
               direction: SlideDirection.right,
             ),
@@ -3019,12 +3071,14 @@ class _ProfileTabState extends State<ProfileTab> {
                   title: 'Edit Profile',
                   subtitle: 'Update your personal information',
                   onTap: () {
+                    HapticUtils.navigationTap();
                     Navigator.of(context).push(
-                      MaterialPageRoute(
+                      BouncePageRoute(
                         builder: (_) => EditProfileScreen(
                           student: student,
                           onProfileUpdated: widget.onProfileUpdated,
                         ),
+                        direction: SlideDirection.right,
                       ),
                     );
                   },
@@ -3062,8 +3116,9 @@ class _ProfileTabState extends State<ProfileTab> {
                   subtitle: 'Version 1.0.0',
                   onTap: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute(
+                      BouncePageRoute(
                         builder: (_) => const AboutPage(),
+                        direction: SlideDirection.right,
                       ),
                     );
                   },
@@ -3074,8 +3129,9 @@ class _ProfileTabState extends State<ProfileTab> {
                   subtitle: 'Read our privacy policy',
                   onTap: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute(
+                      BouncePageRoute(
                         builder: (_) => const PrivacyPolicyPage(),
+                        direction: SlideDirection.right,
                       ),
                     );
                   },

@@ -4,6 +4,7 @@ import '../data/course_catalog.dart';
 import '../api/course_service.dart';
 import '../utils/course_utils.dart';
 import '../utils/animations.dart';
+import '../utils/haptic_feedback.dart';
 import '../widgets/rating_stars.dart';
 import '../widgets/theme_loading_indicator.dart';
 import 'course_detail.dart';
@@ -138,8 +139,9 @@ class _CourseCard extends StatelessWidget {
       ),
       child: InkWell(
         onTap: () {
+          HapticUtils.navigationTap();
           Navigator.of(context).push(
-            SlidePageRoute(
+            BouncePageRoute(
               builder: (_) => CourseDetailPage(course: course),
               direction: SlideDirection.right,
             ),

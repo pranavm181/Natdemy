@@ -8,6 +8,8 @@ import '../screens/all_courses_page.dart';
 import '../screens/about_page.dart';
 import '../screens/privacy_policy_page.dart';
 import '../utils/image_utils.dart';
+import '../utils/animations.dart';
+import '../utils/haptic_feedback.dart';
 
 class MainDrawer extends StatelessWidget {
   const MainDrawer({
@@ -142,9 +144,13 @@ class MainDrawer extends StatelessWidget {
                     icon: Icons.menu_book_outlined,
                     title: 'All Courses',
                     onTap: () {
+                      HapticUtils.navigationTap();
                       Navigator.pop(context);
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => AllCoursesPage()),
+                        BouncePageRoute(
+                          builder: (_) => AllCoursesPage(),
+                          direction: SlideDirection.right,
+                        ),
                       );
                     },
                   ),
@@ -152,6 +158,7 @@ class MainDrawer extends StatelessWidget {
                     icon: Icons.play_circle_outline,
                     title: 'My Courses',
                     onTap: () {
+                      HapticUtils.subtleTap();
                       Navigator.pop(context);
                       if (onNavigateToMyCourses != null) {
                         onNavigateToMyCourses!();
@@ -210,10 +217,12 @@ class MainDrawer extends StatelessWidget {
                     icon: Icons.info_outline,
                     title: 'About',
                     onTap: () {
+                      HapticUtils.navigationTap();
                       Navigator.pop(context);
                       Navigator.of(context).push(
-                        MaterialPageRoute(
+                        BouncePageRoute(
                           builder: (_) => const AboutPage(),
+                          direction: SlideDirection.right,
                         ),
                       );
                     },
@@ -222,10 +231,12 @@ class MainDrawer extends StatelessWidget {
                     icon: Icons.privacy_tip_outlined,
                     title: 'Privacy Policy',
                     onTap: () {
+                      HapticUtils.navigationTap();
                       Navigator.pop(context);
                       Navigator.of(context).push(
-                        MaterialPageRoute(
+                        BouncePageRoute(
                           builder: (_) => const PrivacyPolicyPage(),
+                          direction: SlideDirection.right,
                         ),
                       );
                     },

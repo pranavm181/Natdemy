@@ -13,6 +13,7 @@ import '../widgets/theme_loading_indicator.dart';
 import '../api/course_service.dart';
 import '../api/contact_service.dart';
 import '../utils/animations.dart';
+import '../utils/haptic_feedback.dart';
 import 'subject_detail.dart';
 import 'home.dart';
 
@@ -38,7 +39,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   @override
   void initState() {
     super.initState();
-    _coursesScrollController.addListener(_handleCoursesScroll);
+    // Removed scroll listener - all chapters are shown by default, no pagination needed
     // Check if app was restarted - if so, clear cache and load fresh
     _checkAppRestartAndLoad();
   }
@@ -67,7 +68,6 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
 
   @override
   void dispose() {
-    _coursesScrollController.removeListener(_handleCoursesScroll);
     _coursesScrollController.dispose();
     super.dispose();
   }
@@ -126,6 +126,8 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
             _isLoading = false;
             _hasLoadedOnce = true;
             _lastLoadTime = DateTime.now();
+            // Clear loaded chapters - chapters will only load when user clicks "Load Chapters" button
+            _loadedChapters.clear();
           });
           if (nextSelected != null && _selected == null) {
             _setSelectedCourse(nextSelected!, resetVisibility: true);
@@ -184,7 +186,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
           _isLoading = false;
           _hasLoadedOnce = true;
           _lastLoadTime = DateTime.now();
-          // Reset loaded chapters when courses are refreshed
+          // Clear loaded chapters - chapters will only load when user clicks "Load Chapters" button
           _loadedChapters.clear();
         });
         if (nextSelected != null) {
@@ -286,7 +288,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   void _resetChapterVisibilityForCourse(JoinedCourse course) {
     final key = _courseKey(course);
     final total = _resolveAssignedChapters(course).length;
-    _visibleChapterCounts[key] = total == 0 ? 0 : math.min(_chapterChunkSize, total);
+    _visibleChapterCounts[key] = total; // Show all chapters by default
   }
 
   void _ensureChapterVisibilityForCourse(JoinedCourse course) {
@@ -298,7 +300,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
     final total = _resolveAssignedChapters(course).length;
     final current = _visibleChapterCounts[key] ?? 0;
     if (current == 0 && total > 0) {
-      _visibleChapterCounts[key] = math.min(_chapterChunkSize, total);
+      _visibleChapterCounts[key] = total; // Show all chapters
     } else if (current > total) {
       _visibleChapterCounts[key] = total;
     }
@@ -531,10 +533,9 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
     final streamTitle = _resolveStreamTitle(selectedCourse);
     final chapters = _resolveAssignedChapters(selectedCourse);
     final totalChapters = chapters.length;
-    final visibleCount = _visibleChapterCounts[courseKey] ??
-        (totalChapters == 0 ? 0 : math.min(_chapterChunkSize, totalChapters));
+    final visibleCount = _visibleChapterCounts[courseKey] ?? totalChapters;
     final visibleChapters = chapters.take(visibleCount).toList();
-    final hasMoreChapters = visibleCount < totalChapters;
+    final hasMoreChapters = false; // Always show all chapters, no pagination needed
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -563,7 +564,10 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
             child: Padding(
               padding: const EdgeInsets.all(24.0),
               child: OutlinedButton.icon(
-                onPressed: _loadChaptersForSelectedCourse,
+                onPressed: () {
+                  HapticUtils.buttonPress();
+                  _loadChaptersForSelectedCourse();
+                },
                 icon: const Icon(Icons.book_outlined),
                 label: const Text('Load Chapters'),
                 style: OutlinedButton.styleFrom(
@@ -648,6 +652,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   onTap: () async {
+                    HapticUtils.subtleTap();
                     // Ensure chapters are loaded before navigating
                     if (!chaptersLoaded && selectedCourse.courseId != null && selectedCourse.streamId != null) {
                       // Show loading
@@ -690,24 +695,28 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                         );
                         
                         if (mounted) {
+                          HapticUtils.navigationTap();
                           Navigator.of(context).push(
-                            MaterialPageRoute(
+                            BouncePageRoute(
                               builder: (_) => SubjectDetailPage(
                                 courseTitle: selectedCourse.title,
                                 chapter: updatedChapter,
                               ),
+                              direction: SlideDirection.right,
                             ),
                           );
                         }
                       }
                     } else {
                       // Chapters already loaded, navigate directly
+                      HapticUtils.navigationTap();
                       Navigator.of(context).push(
-                        MaterialPageRoute(
+                        BouncePageRoute(
                           builder: (_) => SubjectDetailPage(
                             courseTitle: selectedCourse.title,
                             chapter: chapter,
                           ),
+                          direction: SlideDirection.right,
                         ),
                       );
                     }
@@ -716,19 +725,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
               );
             },
           ),
-          if (hasMoreChapters)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: OutlinedButton.icon(
-                onPressed: _increaseVisibleChaptersForSelected,
-                icon: const Icon(Icons.expand_more),
-                label: const Text('Load more chapters'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF582DB0),
-                  side: const BorderSide(color: Color(0xFF582DB0), width: 1.5),
-                ),
-              ),
-            ),
+          // Removed "Load more chapters" button - all chapters are shown by default
         ],
       ],
     );
@@ -1131,9 +1128,12 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   }
 
   List<CourseChapter> _resolveAssignedChapters(JoinedCourse course) {
-    if (course.chapters.isNotEmpty) {
+    // Only return chapters if they have been explicitly loaded via "Load Chapters" button
+    final courseKey = '${course.courseId}_${course.streamId}';
+    if (_loadedChapters.contains(courseKey) && course.chapters.isNotEmpty) {
       return course.chapters;
     }
+    // Don't show chapters even if they exist in cache - user must click "Load Chapters"
     return const [];
   }
 

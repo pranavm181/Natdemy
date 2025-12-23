@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import 'screens/splash_screen.dart';
+import 'providers/student_provider.dart';
+import 'providers/courses_provider.dart';
+import 'providers/enrolled_courses_provider.dart';
+import 'providers/banners_provider.dart';
+import 'providers/testimonials_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,9 +26,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Natdemy',
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => StudentProvider()),
+        ChangeNotifierProvider(create: (_) => CoursesProvider()),
+        ChangeNotifierProvider(create: (_) => EnrolledCoursesProvider()),
+        ChangeNotifierProvider(create: (_) => BannersProvider()),
+        ChangeNotifierProvider(create: (_) => TestimonialsProvider()),
+      ],
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Natdemy',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF582DB0),
@@ -161,6 +175,7 @@ class MyApp extends StatelessWidget {
         ),
       ),
       home: const SplashScreen(),
+      ),
     );
   }
 }

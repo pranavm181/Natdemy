@@ -3,8 +3,11 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
 import '../data/banner.dart' show AppBanner;
 import '../data/student.dart';
+import '../providers/student_provider.dart';
+import '../providers/banners_provider.dart';
 
 const double _bannerWebAspectRatio = 16 / 5.6;
 const double _bannerMobileAspectRatio = 16 / 5.6;
@@ -12,14 +15,16 @@ const double _bannerMobileAspectRatio = 16 / 5.6;
 class BannerCarousel extends StatefulWidget {
   const BannerCarousel({
     super.key,
-    required this.banners,
-    required this.student,
+    this.banners,
+    this.student,
     this.onPageChanged,
+    this.useProvider = true,
   });
 
-  final List<AppBanner> banners;
-  final Student student;
+  final List<AppBanner>? banners; // Optional - can use Provider instead
+  final Student? student; // Optional - can use Provider instead
   final ValueChanged<int>? onPageChanged;
+  final bool useProvider; // Whether to use Provider for data
 
   @override
   State<BannerCarousel> createState() => _BannerCarouselState();
@@ -65,7 +70,24 @@ class _BannerCarouselState extends State<BannerCarousel> {
   }
 
   int _getTotalBanners() {
-    return widget.banners.isEmpty ? 1 : widget.banners.length;
+    final banners = _getBanners();
+    return banners.isEmpty ? 1 : banners.length;
+  }
+
+  List<AppBanner> _getBanners() {
+    if (widget.useProvider) {
+      final bannersProvider = Provider.of<BannersProvider>(context, listen: false);
+      return bannersProvider.banners;
+    }
+    return widget.banners ?? [];
+  }
+
+  Student? _getStudent() {
+    if (widget.useProvider) {
+      final studentProvider = Provider.of<StudentProvider>(context, listen: false);
+      return studentProvider.student;
+    }
+    return widget.student;
   }
 
   Future<void> _handleBannerTap(AppBanner? banner) async {
@@ -123,13 +145,15 @@ class _BannerCarouselState extends State<BannerCarousel> {
                   },
                   itemCount: totalBanners,
                   itemBuilder: (context, index) {
-                    if (widget.banners.isEmpty) {
-                      return _AppBanner(student: widget.student);
+                    final banners = _getBanners();
+                    final student = _getStudent();
+                    if (banners.isEmpty) {
+                      return _AppBanner(student: student);
                     }
-                    final banner = widget.banners[index];
+                    final banner = banners[index];
                     return _ApiBanner(
                       banner: banner,
-                      student: widget.student,
+                      student: student,
                       onTap: () => _handleBannerTap(banner),
                     );
                   },
@@ -143,7 +167,8 @@ class _BannerCarouselState extends State<BannerCarousel> {
                     children: List.generate(
                       totalBanners,
                       (index) {
-                        final isActive = _currentPage == index || (widget.banners.isEmpty && index == 0);
+                        final banners = _getBanners();
+                        final isActive = _currentPage == index || (banners.isEmpty && index == 0);
                         return AnimatedContainer(
                           duration: const Duration(milliseconds: 250),
                           margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -178,9 +203,9 @@ class _BannerCarouselState extends State<BannerCarousel> {
 
 // App Banner (default banner)
 class _AppBanner extends StatelessWidget {
-  const _AppBanner({required this.student});
+  const _AppBanner({this.student});
 
-  final Student student;
+  final Student? student;
 
   @override
   Widget build(BuildContext context) {
@@ -237,12 +262,12 @@ class _AppBanner extends StatelessWidget {
 class _ApiBanner extends StatefulWidget {
   const _ApiBanner({
     required this.banner,
-    required this.student,
+    this.student,
     this.onTap,
   });
 
   final AppBanner banner;
-  final Student student;
+  final Student? student;
   final VoidCallback? onTap;
 
   @override

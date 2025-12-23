@@ -311,6 +311,78 @@ class SlidePageRoute<T> extends PageRoute<T> {
 
 enum SlideDirection { right, left, top, bottom }
 
+/// Custom page route with bounce transition effect
+class BouncePageRoute<T> extends PageRoute<T> {
+  final WidgetBuilder builder;
+  final SlideDirection direction;
+
+  BouncePageRoute({
+    required this.builder,
+    this.direction = SlideDirection.right,
+  });
+
+  @override
+  Color? get barrierColor => null;
+
+  @override
+  String? get barrierLabel => null;
+
+  @override
+  bool get maintainState => true;
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 400);
+
+  @override
+  Widget buildPage(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation) {
+    return builder(context);
+  }
+
+  @override
+  Widget buildTransitions(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation, Widget child) {
+    // Create a bounce curve animation
+    final curvedAnimation = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutBack,
+    );
+
+    Offset begin;
+    switch (direction) {
+      case SlideDirection.right:
+        begin = const Offset(1.0, 0.0);
+        break;
+      case SlideDirection.left:
+        begin = const Offset(-1.0, 0.0);
+        break;
+      case SlideDirection.top:
+        begin = const Offset(0.0, -1.0);
+        break;
+      case SlideDirection.bottom:
+        begin = const Offset(0.0, 1.0);
+        break;
+    }
+
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: begin,
+        end: Offset.zero,
+      ).animate(curvedAnimation),
+      child: FadeTransition(
+        opacity: curvedAnimation,
+        child: ScaleTransition(
+          scale: Tween<double>(
+            begin: 0.9,
+            end: 1.0,
+          ).animate(curvedAnimation),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
 /// Animated list item wrapper
 class AnimatedListItem extends StatelessWidget {
   const AnimatedListItem({

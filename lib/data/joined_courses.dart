@@ -499,8 +499,8 @@ class JoinedCourses {
               ..addAll(apiCourses);
             debugPrint('✅ Loaded ${_joined.length} course(s) from API for $_currentEmail');
             
-            // Load full stream data (chapters, lessons, materials, MCQs) for all enrolled courses
-            await _loadFullStreamDataForEnrolledCourses();
+            // Chapters will be loaded on-demand when user clicks "Load Chapters" button
+            // This significantly improves page load time
             
             await _saveCourses();
             return;

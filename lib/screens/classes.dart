@@ -51,6 +51,9 @@ class ClassesScreen extends StatelessWidget {
     final items = _mockAssignedClasses(student);
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         title: const Text('MY CLASSES'),
         actions: [
           IconButton(

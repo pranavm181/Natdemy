@@ -212,6 +212,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: CupertinoNavigationBarBackButton(
           onPressed: () => Navigator.of(context).pop(),

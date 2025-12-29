@@ -843,8 +843,7 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _showContactDialog(BuildContext context) async {
-    const whatsappNum1 = '919207666615';
-    const whatsappNum2 = '919207666614';
+    const whatsappNum = '919207666615'; // +91 92076 66615
     
     await showModalBottomSheet(
       context: context,
@@ -955,64 +954,33 @@ class _HomeTabState extends State<HomeTab> {
                       ],
                     ),
                     const SizedBox(height: 28),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF25D366),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              elevation: 4,
-                            ),
-                            icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 18),
-                            label: const Text(
-                              'WhatsApp 1',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 14,
-                              ),
-                            ),
-                            onPressed: () async {
-                              final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
-                              final uri = Uri.parse('https://wa.me/$whatsappNum1?text=$message');
-                              Navigator.of(sheetContext).pop();
-                              await launchUrl(uri, mode: LaunchMode.externalApplication);
-                            },
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF25D366),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 4,
+                        ),
+                        icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 18),
+                        label: const Text(
+                          'WhatsApp Support',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF25D366),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              elevation: 4,
-                            ),
-                            icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 18),
-                            label: const Text(
-                              'WhatsApp 2',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 14,
-                              ),
-                            ),
-                            onPressed: () async {
-                              final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
-                              final uri = Uri.parse('https://wa.me/$whatsappNum2?text=$message');
-                              Navigator.of(sheetContext).pop();
-                              await launchUrl(uri, mode: LaunchMode.externalApplication);
-                            },
-                          ),
-                        ),
-                      ],
+                        onPressed: () async {
+                          final message = Uri.encodeComponent('i am contacting from the natdemy app for some support');
+                          final uri = Uri.parse('https://wa.me/$whatsappNum?text=$message');
+                          Navigator.of(sheetContext).pop();
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        },
+                      ),
                     ),
                     const SizedBox(height: 24),
                     Container(
@@ -2750,6 +2718,9 @@ class _ProfileTabState extends State<ProfileTab> {
         },
       ),
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu, color: Colors.black),

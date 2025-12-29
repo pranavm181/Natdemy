@@ -96,6 +96,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       // For web, show a message that PDF will open in browser
       return Scaffold(
         appBar: AppBar(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
           leading: CupertinoNavigationBarBackButton(
             onPressed: () => Navigator.of(context).pop(),
             color: Colors.black,

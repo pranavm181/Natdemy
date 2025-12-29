@@ -66,8 +66,8 @@ class ContactInfo {
   static ContactInfo getDefault() {
     return const ContactInfo(
       email: 'support@natdemy.com',
-      phone: '+91 92076 66621',
-      whatsappNumber: '+91 92076666621',
+      phone: '+91 92076 66615',
+      whatsappNumber: '+91 92076 66615',
       whatsappGroupLink: 'https://chat.whatsapp.com/LpNUsxNbGPq4eFgVgFGSL2?mode=wwt',
       website: 'www.natdemy.com',
     );

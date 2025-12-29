@@ -9,6 +9,9 @@ class PrivacyPolicyPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         leading: CupertinoNavigationBarBackButton(
           onPressed: () => Navigator.of(context).pop(),
           color: Colors.black,
@@ -22,8 +25,6 @@ class PrivacyPolicyPage extends StatelessWidget {
             fontStyle: FontStyle.italic,
           ),
         ),
-        backgroundColor: Colors.white,
-        elevation: 0,
       ),
       body: AppAnimations.fadeSlideIn(
         delay: 100,

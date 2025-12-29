@@ -325,6 +325,9 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
           title: const Text(
             'MY COURSES',
             style: TextStyle(
@@ -374,6 +377,9 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
         },
       ),
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu, color: Colors.black),

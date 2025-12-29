@@ -148,6 +148,7 @@ class MyApp extends StatelessWidget {
           elevation: 0,
           centerTitle: true,
           backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
           foregroundColor: const Color(0xFF1E293B),
           titleTextStyle: GoogleFonts.inter(
             color: const Color(0xFF000000),

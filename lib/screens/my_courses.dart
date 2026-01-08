@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../data/joined_courses.dart';
 import '../data/lessons_config.dart';
 import '../data/student.dart';
@@ -1239,38 +1240,33 @@ class _Banner extends StatelessWidget {
                 selected.thumbnailUrl != null && selected.thumbnailUrl!.isNotEmpty
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          CourseService.getFullImageUrl(selected.thumbnailUrl),
+                        child: CachedNetworkImage(
+                          imageUrl: CourseService.getFullImageUrl(selected.thumbnailUrl!),
                           width: 64,
                           height: 64,
                           fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              width: 64,
-                              height: 64,
-                              color: Colors.grey[200],
-                              child: const Center(
-                                child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF582DB0)),
-                                  ),
+                          placeholder: (context, url) => Container(
+                            width: 64,
+                            height: 64,
+                            color: Colors.grey[200],
+                            child: const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF582DB0)),
                                 ),
                               ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return Icon(
-                              CourseUtils.getCourseIcon(selected.title),
-                              color: const Color(0xFF000000),
-                              size: 48,
-                            );
-                          },
-                          cacheWidth: 128, // Cache smaller image for better performance
-                          cacheHeight: 128,
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Icon(
+                            CourseUtils.getCourseIcon(selected.title),
+                            color: const Color(0xFF000000),
+                            size: 48,
+                          ),
+                          memCacheWidth: 128, // Cache smaller image for better performance
+                          memCacheHeight: 128,
                         ),
                       )
                     : Icon(

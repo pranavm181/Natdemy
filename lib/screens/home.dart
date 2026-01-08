@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../data/student.dart';
 import '../providers/student_provider.dart';
 import '../providers/courses_provider.dart';
@@ -2302,7 +2303,7 @@ class _NeatTestimonialCard extends StatelessWidget {
                       backgroundColor: const Color(0xFF582DB0),
                       backgroundImage: testimonial.imageUrl != null &&
                               testimonial.imageUrl!.isNotEmpty
-                          ? NetworkImage(testimonial.imageUrl!)
+                          ? CachedNetworkImageProvider(testimonial.imageUrl!)
                           : null,
                       child: testimonial.imageUrl == null ||
                               testimonial.imageUrl!.isEmpty
@@ -2406,18 +2407,20 @@ class _CourseCard extends StatelessWidget {
               course.thumbnailUrl != null && course.thumbnailUrl!.isNotEmpty
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(kIsWeb ? 14 : 10),
-                      child: Image.network(
-                        CourseService.getFullImageUrl(course.thumbnailUrl),
+                      child: CachedNetworkImage(
+                        imageUrl: CourseService.getFullImageUrl(course.thumbnailUrl),
                         width: kIsWeb ? 96 : 68,
                         height: kIsWeb ? 96 : 68,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
+                        errorWidget: (context, url, error) {
                           return Icon(
                             CourseUtils.getCourseIcon(course.title),
                             color: const Color(0xFFA1C95C),
                             size: kIsWeb ? 76 : 54,
                           );
                         },
+                        memCacheWidth: kIsWeb ? 192 : 136,
+                        memCacheHeight: kIsWeb ? 192 : 136,
                       ),
                     )
                   : Icon(

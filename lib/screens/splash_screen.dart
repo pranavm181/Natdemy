@@ -79,17 +79,19 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkLoginStatus() async {
-    // Initialize banner cache only (courses will load when needed)
+    // Initialize banner cache and load preferences in parallel
     final cacheInit = BannerService.initializeCache();
+    final prefsInit = SharedPreferences.getInstance();
     
-    // Wait for animation to complete (reduced from 2000ms to 1200ms for faster loading)
-    await Future.delayed(const Duration(milliseconds: 1200));
-    
-    // Wait for cache initialization to complete
-    await cacheInit;
+    // Wait for animation to complete OR cache/prefs initialization, whichever completes first
+    await Future.wait([
+      Future.delayed(const Duration(milliseconds: 800)), // Reduced delay
+      cacheInit,
+      prefsInit,
+    ]);
 
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await prefsInit;
       final savedEmail = prefs.getString('user_email');
       final savedName = prefs.getString('user_name');
       final isLoggedIn = prefs.getBool('is_logged_in') ?? false;

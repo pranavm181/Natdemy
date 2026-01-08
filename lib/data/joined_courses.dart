@@ -489,7 +489,7 @@ class JoinedCourses {
       for (int i = 0; i < retries; i++) {
         try {
           if (i > 0) {
-            await Future.delayed(Duration(milliseconds: 100 * i));
+            await Future.delayed(Duration(milliseconds: 50 * i)); // Reduced delay
           }
 
           try {
@@ -1278,7 +1278,7 @@ class JoinedCourses {
       try {
 
         if (i > 0) {
-          await Future.delayed(Duration(milliseconds: 100 * i));
+          await Future.delayed(Duration(milliseconds: 50 * i)); // Reduced delay
         }
 
         final prefs = await SharedPreferences.getInstance();

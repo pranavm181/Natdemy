@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'image_utils_io.dart' if (dart.library.html) 'image_utils_stub.dart' as io_utils;
 import 'dart:io' if (dart.library.html) 'dart:html' as html;
 
@@ -23,12 +24,12 @@ class ImageUtils {
     
     // Handle network URLs (from API) - works on both web and mobile
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return NetworkImage(imagePath);
+      return CachedNetworkImageProvider(imagePath);
     }
     
     // Handle data URLs (base64 encoded images) - mainly for web
     if (imagePath.startsWith('data:')) {
-      return NetworkImage(imagePath);
+      return NetworkImage(imagePath); // Data URLs don't need caching
     }
     
     if (kIsWeb) {

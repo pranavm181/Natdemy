@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../data/course_catalog.dart';
 import '../api/course_service.dart';
 import '../utils/course_utils.dart';
@@ -165,18 +166,20 @@ class _CourseCard extends StatelessWidget {
               course.thumbnailUrl != null && course.thumbnailUrl!.isNotEmpty
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        CourseService.getFullImageUrl(course.thumbnailUrl),
+                      child: CachedNetworkImage(
+                        imageUrl: CourseService.getFullImageUrl(course.thumbnailUrl),
                         width: 56,
                         height: 56,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
+                        errorWidget: (context, url, error) {
                           return Icon(
                             CourseUtils.getCourseIcon(course.title),
                             color: const Color(0xFFA1C95C),
                             size: 48,
                           );
                         },
+                        memCacheWidth: 112,
+                        memCacheHeight: 112,
                       ),
                     )
                   : Icon(

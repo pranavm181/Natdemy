@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 class ApiClient {
   static const String baseUrl = 'https://lms.natdemy.com';
   static const int maxRetries = 3;
-  static const Duration baseRetryDelay = Duration(seconds: 2);
+  static const Duration baseRetryDelay = Duration(milliseconds: 500); // Reduced from 2 seconds
   
   // Get authentication token from storage
   static Future<String?> getToken() async {

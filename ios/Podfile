@@ -39,6 +39,9 @@ post_install do |installer|
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
     end
+
+    # Apply Flutter’s recommended build settings (fixes missing Flutter.h / header paths)
+    flutter_additional_ios_build_settings(target)
   end
 end
 

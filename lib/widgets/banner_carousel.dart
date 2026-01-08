@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../data/banner.dart' show AppBanner;
 import '../data/student.dart';
 import '../providers/student_provider.dart';
@@ -315,13 +316,11 @@ class _ApiBannerState extends State<_ApiBanner> {
             children: [
               ImageFiltered(
                 imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                child: Image.network(
-                  widget.banner.thumbnail!,
+                child: CachedNetworkImage(
+                  imageUrl: widget.banner.thumbnail!,
                   fit: BoxFit.cover,
                   alignment: Alignment.center,
-                  errorBuilder: (context, error, stackTrace) {
-                    return _AppBanner(student: widget.student);
-                  },
+                  errorWidget: (context, url, error) => _AppBanner(student: widget.student),
                   color: Colors.black.withOpacity(0.15),
                   colorBlendMode: BlendMode.srcATop,
                 ),
@@ -340,13 +339,11 @@ class _ApiBannerState extends State<_ApiBanner> {
                 ),
               ),
               Positioned.fill(
-                  child: Image.network(
-                    widget.banner.thumbnail!,
-                  fit: BoxFit.cover,
+                  child: CachedNetworkImage(
+                    imageUrl: widget.banner.thumbnail!,
+                    fit: BoxFit.cover,
                     alignment: Alignment.center,
-                    errorBuilder: (context, error, stackTrace) {
-                      return _AppBanner(student: widget.student);
-                    },
+                    errorWidget: (context, url, error) => _AppBanner(student: widget.student),
                 ),
               ),
             ],

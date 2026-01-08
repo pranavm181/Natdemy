@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:cached_network_image/cached_network_image.dart';
 import '../data/testimonial.dart';
 import 'rating_stars.dart';
 
@@ -300,7 +301,7 @@ class _TestimonialCard extends StatelessWidget {
                   backgroundColor: const Color(0xFF582DB0),
                   backgroundImage: testimonial.imageUrl != null &&
                           testimonial.imageUrl!.isNotEmpty
-                      ? NetworkImage(testimonial.imageUrl!)
+                      ? CachedNetworkImageProvider(testimonial.imageUrl!)
                       : null,
                   child: testimonial.imageUrl == null ||
                           testimonial.imageUrl!.isEmpty

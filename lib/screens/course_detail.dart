@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../data/course_catalog.dart';
 import '../utils/course_utils.dart';
 import '../api/contact_service.dart';
@@ -134,18 +135,20 @@ class CourseDetailPage extends StatelessWidget {
                         course.thumbnailUrl != null && course.thumbnailUrl!.isNotEmpty
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  CourseService.getFullImageUrl(course.thumbnailUrl),
+                                child: CachedNetworkImage(
+                                  imageUrl: CourseService.getFullImageUrl(course.thumbnailUrl),
                                   width: 64,
                                   height: 64,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
+                                  errorWidget: (context, url, error) {
                                     return Icon(
                                       CourseUtils.getCourseIcon(course.title),
                                       color: const Color(0xFF000000),
                                       size: 48,
                                     );
                                   },
+                                  memCacheWidth: 128,
+                                  memCacheHeight: 128,
                                 ),
                               )
                             : Icon(

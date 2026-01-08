@@ -3,6 +3,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import 'screens/splash_screen.dart';
 import 'providers/student_provider.dart';
 import 'providers/courses_provider.dart';
@@ -13,10 +14,18 @@ import 'providers/testimonials_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Mark app as restarted for cache clearing
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setBool('app_restarted', true);
-  await prefs.setString('app_last_run', DateTime.now().toIso8601String());
+  // Preload Google Fonts for faster rendering
+  await Future.wait([
+    GoogleFonts.pendingFonts([
+      GoogleFonts.inter(),
+      GoogleFonts.lato(),
+    ]),
+    // Mark app as restarted for cache clearing
+    SharedPreferences.getInstance().then((prefs) async {
+      await prefs.setBool('app_restarted', true);
+      await prefs.setString('app_last_run', DateTime.now().toIso8601String());
+    }),
+  ]);
   
   runApp(const MyApp());
 }

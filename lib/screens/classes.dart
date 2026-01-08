@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../data/student.dart';
 import 'loginscreen.dart';
 class ClassesScreen extends StatelessWidget {
@@ -82,9 +83,13 @@ class ClassesScreen extends StatelessWidget {
                   SizedBox(
                     width: MediaQuery.of(context).size.width < 360 ? 100 : 140,
                     height: 90,
-                    child: Ink.image(
-                      image: NetworkImage(item.thumbnailUrl),
+                    child: CachedNetworkImage(
+                      imageUrl: item.thumbnailUrl,
                       fit: BoxFit.cover,
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.error),
+                      ),
                     ),
                   ),
                   SizedBox(width: MediaQuery.of(context).size.width < 360 ? 8 : 12),

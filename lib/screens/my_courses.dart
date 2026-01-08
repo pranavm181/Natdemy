@@ -244,6 +244,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
           _selected = updated;
           _loadedChapters.add(courseKey);
           _isLoadingChapters = false;
+          // Ensure all chapters are visible after loading
           _resetChapterVisibilityForCourse(updated);
         });
       }
@@ -272,10 +273,11 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
     final chapters = _resolveAssignedChapters(selectedCourse);
     if (chapters.isEmpty) return;
     final key = _courseKey(selectedCourse);
-    final current = _visibleChapterCounts[key] ?? math.min(_chapterChunkSize, chapters.length);
+    // Always show all chapters - no pagination needed
+    final current = _visibleChapterCounts[key] ?? chapters.length;
     if (current >= chapters.length) return;
     setState(() {
-      _visibleChapterCounts[key] = math.min(current + _chapterChunkSize, chapters.length);
+      _visibleChapterCounts[key] = chapters.length; // Show all chapters
     });
   }
 
@@ -287,19 +289,22 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
 
   void _resetChapterVisibilityForCourse(JoinedCourse course) {
     final key = _courseKey(course);
-    final total = _resolveAssignedChapters(course).length;
+    final chapters = _resolveAssignedChapters(course);
+    final total = chapters.length;
     _visibleChapterCounts[key] = total; // Show all chapters by default
   }
 
   void _ensureChapterVisibilityForCourse(JoinedCourse course) {
     final key = _courseKey(course);
+    final chapters = _resolveAssignedChapters(course);
+    final total = chapters.length;
     if (!_visibleChapterCounts.containsKey(key)) {
-      _resetChapterVisibilityForCourse(course);
+      _visibleChapterCounts[key] = total; // Show all chapters by default
       return;
     }
-    final total = _resolveAssignedChapters(course).length;
     final current = _visibleChapterCounts[key] ?? 0;
-    if (current == 0 && total > 0) {
+    // Always ensure all chapters are visible
+    if (current < total) {
       _visibleChapterCounts[key] = total; // Show all chapters
     } else if (current > total) {
       _visibleChapterCounts[key] = total;
@@ -539,8 +544,8 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
     final streamTitle = _resolveStreamTitle(selectedCourse);
     final chapters = _resolveAssignedChapters(selectedCourse);
     final totalChapters = chapters.length;
-    final visibleCount = _visibleChapterCounts[courseKey] ?? totalChapters;
-    final visibleChapters = chapters.take(visibleCount).toList();
+    // Always show all chapters - no limit
+    final visibleChapters = chapters; // Show all chapters, no pagination
     final hasMoreChapters = false; // Always show all chapters, no pagination needed
 
     return Column(

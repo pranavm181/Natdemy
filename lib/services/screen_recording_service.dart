@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 
 class ScreenRecordingService {
-  static const MethodChannel _channel = MethodChannel('com.example.classapp/screen_recording');
+  static const MethodChannel _channel = MethodChannel('com.natdemy.learning/screen_recording');
 
   /// Enable or disable screen recording blocking
   /// 

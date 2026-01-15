@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/student.dart';
@@ -6,6 +10,7 @@ import '../data/joined_courses.dart';
 import '../data/auth_helper.dart';
 import '../api/student_service.dart';
 import '../api/banner_service.dart';
+import '../api/home_service.dart';
 import 'home.dart';
 import 'loginscreen.dart';
 import 'onboarding_screen.dart';
@@ -79,15 +84,20 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkLoginStatus() async {
-    // Initialize banner cache and load preferences in parallel
+    // Start initializations in parallel
     final cacheInit = BannerService.initializeCache();
     final prefsInit = SharedPreferences.getInstance();
+    final homeFetch = HomeService.fetchHomeData(forceRefresh: true);
     
-    // Wait for animation to complete OR cache/prefs initialization, whichever completes first
+    // Wait for animation to complete AND essential initializations
     await Future.wait([
-      Future.delayed(const Duration(milliseconds: 800)), // Reduced delay
+      Future.delayed(const Duration(milliseconds: 800)), // Animation buffer
       cacheInit,
       prefsInit,
+      homeFetch.catchError((e) {
+        debugPrint('⚠️ Pre-fetch home data failed: $e');
+        return <String, dynamic>{};
+      }),
     ]);
 
     try {
@@ -155,7 +165,7 @@ class _SplashScreenState extends State<SplashScreen>
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF8B5CF6), Color(0xFF582DB0)],
+            colors: [AppColors.primaryLight, AppColors.primary],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -170,37 +180,37 @@ class _SplashScreenState extends State<SplashScreen>
                 child: ScaleTransition(
                   scale: _logoScaleAnimation,
                   child: Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: EdgeInsets.all(20.r),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.white.withOpacity(0.3),
-                          blurRadius: 40,
-                          spreadRadius: 10,
+                          color: AppColors.surface.withOpacity(0.3),
+                          blurRadius: 40.r,
+                          spreadRadius: 10.r,
                         ),
                         BoxShadow(
-                          color: const Color(0xFFA1C95C).withOpacity(0.2),
-                          blurRadius: 60,
-                          spreadRadius: 20,
+                          color: AppColors.accent.withOpacity(0.2),
+                          blurRadius: 60.r,
+                          spreadRadius: 20.r,
                         ),
                       ],
                     ),
                     child: Image.asset(
                       'assets/images/LIGHT LOGO-NAT.png',
-                      height: 140,
+                      height: 140.h,
                       fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
-                          padding: const EdgeInsets.all(24),
+                          padding: EdgeInsets.all(24.r),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: AppColors.surface.withOpacity(0.2),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.school,
-                            size: 80,
-                            color: Colors.white,
+                            size: 80.r,
+                            color: AppColors.surface,
                           ),
                         );
                       },
@@ -208,7 +218,7 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
               ),
-              const SizedBox(height: 40),
+              SizedBox(height: 40.h),
               // Tagline with slide animation
               SlideTransition(
                 position: _taglineSlideAnimation,
@@ -218,10 +228,10 @@ class _SplashScreenState extends State<SplashScreen>
                     children: [
                       Text(
                         'Any Time Any Where',
-                        style: TextStyle(
-                          fontSize: 18,
+                        style: AppTextStyles.title2.copyWith(
+                          fontSize: 18.sp,
                           fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.95),
+                          color: AppColors.surface.withOpacity(0.95),
                           letterSpacing: 2,
                           shadows: [
                             Shadow(
@@ -232,16 +242,16 @@ class _SplashScreenState extends State<SplashScreen>
                           ],
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: AppSpacing.sm.h),
                       Container(
-                        width: 60,
-                        height: 2,
+                        width: 60.w,
+                        height: 2.h,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFA1C95C),
-                          borderRadius: BorderRadius.circular(2),
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(2.r),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFA1C95C).withOpacity(0.5),
+                              color: AppColors.accent.withOpacity(0.5),
                               blurRadius: 4,
                               spreadRadius: 1,
                             ),
@@ -252,30 +262,28 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
               ),
-              const SizedBox(height: 60),
+              SizedBox(height: 60.h),
               // Loading indicator with fade
               FadeTransition(
                 opacity: _loadingFadeAnimation,
                 child: Column(
                   children: [
                     SizedBox(
-                      width: 50,
-                      height: 50,
+                      width: 50.w,
+                      height: 50.w,
                       child: CircularProgressIndicator(
-                        strokeWidth: 3.5,
+                        strokeWidth: 3.5.w,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.white.withOpacity(0.9),
+                          AppColors.surface.withOpacity(0.9),
                         ),
-                        backgroundColor: Colors.white.withOpacity(0.2),
+                        backgroundColor: AppColors.surface.withOpacity(0.2),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: AppSpacing.md.h),
                     Text(
                       'Loading...',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        color: Colors.white.withOpacity(0.8),
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.surface.withOpacity(0.8),
                         letterSpacing: 1,
                       ),
                     ),

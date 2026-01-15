@@ -4,147 +4,94 @@ import 'dart:convert';
 import '../data/material.dart';
 import 'api_client.dart';
 import '../utils/json_parser.dart';
+import 'home_service.dart';
 
 class MaterialService {
-  // Fetch materials from home API
+  // Fetch materials via HomeService (deduplicated)
   static Future<List<CourseMaterial>> fetchMaterials() async {
     try {
-      debugPrint('🔄 Fetching materials from API...');
-      final response = await ApiClient.get('/api/home/', queryParams: {'format': 'json'}, includeAuth: false);
+      debugPrint('🔄 Fetching materials from HomeService...');
+      final data = await HomeService.fetchHomeData();
       
-      debugPrint('📡 Materials API Response Status: ${response.statusCode}');
-      
-      // Check if response is HTML (error page) instead of JSON
-      final isHtml = response.body.trim().startsWith('<!DOCTYPE') || 
-                     response.body.trim().startsWith('<html') ||
-                     response.body.trim().startsWith('<HTML');
-      
-      if (isHtml) {
-        debugPrint('⚠️ Materials API returned HTML error page (status: ${response.statusCode})');
-        return [];
-      }
-      
-      if (response.statusCode == 200) {
-        try {
-          // Parse JSON in background thread to avoid blocking UI
-          final Map<String, dynamic> data = await JsonParser.parseJson(response.body);
+      if (data.containsKey('data') && data['data'] is Map) {
+        final dataMap = data['data'] as Map<String, dynamic>;
+        
+        if (dataMap.containsKey('materials') && dataMap['materials'] is List) {
+          final List<dynamic> materialsJson = dataMap['materials'] as List<dynamic>;
+          debugPrint('📄 Found ${materialsJson.length} materials in HomeService response');
           
-          if (data.containsKey('data') && data['data'] is Map) {
-            final dataMap = data['data'] as Map<String, dynamic>;
-            
-            if (dataMap.containsKey('materials') && dataMap['materials'] is List) {
-              final List<dynamic> materialsJson = dataMap['materials'] as List<dynamic>;
-              debugPrint('📄 Found ${materialsJson.length} materials in API response');
+          final materials = <CourseMaterial>[];
+          for (var i = 0; i < materialsJson.length; i++) {
+            try {
+              final materialJson = materialsJson[i] as Map<String, dynamic>;
               
-              final materials = <CourseMaterial>[];
+              String? courseId;
+              if (materialJson.containsKey('course') && materialJson['course'] is Map) {
+                final courseObj = materialJson['course'] as Map<String, dynamic>;
+                courseId = courseObj['id']?.toString();
+              } else if (materialJson.containsKey('course_id')) {
+                courseId = materialJson['course_id']?.toString();
+              }
               
-              for (var i = 0; i < materialsJson.length; i++) {
-                try {
-                  final materialJson = materialsJson[i] as Map<String, dynamic>;
-                  
-                  // Extract course ID from nested course object
-                  String? courseId;
-                  if (materialJson.containsKey('course') && materialJson['course'] is Map) {
-                    final courseObj = materialJson['course'] as Map<String, dynamic>;
-                    courseId = courseObj['id']?.toString();
-                  } else if (materialJson.containsKey('course_id')) {
-                    courseId = materialJson['course_id']?.toString();
-                  }
-                  
-                  // Parse size_bytes (can be string or int)
-                  int? sizeBytes;
-                  if (materialJson['size_bytes'] != null) {
-                    if (materialJson['size_bytes'] is int) {
-                      sizeBytes = materialJson['size_bytes'] as int;
-                    } else if (materialJson['size_bytes'] is String) {
-                      sizeBytes = int.tryParse(materialJson['size_bytes'] as String);
-                    }
-                  }
-                  
-                  // Parse uploaded_at date
-                  DateTime? uploadedAt;
-                  if (materialJson['uploaded_at'] != null) {
-                    try {
-                      uploadedAt = DateTime.parse(materialJson['uploaded_at'] as String);
-                    } catch (e) {
-                      debugPrint('Error parsing uploaded_at: $e');
-                    }
-                  }
-                  
-                  // Generate size label if not provided
-                  String? sizeLabel = materialJson['size_label'] as String?;
-                  if (sizeLabel == null && sizeBytes != null) {
-                    if (sizeBytes < 1024) {
-                      sizeLabel = '$sizeBytes B';
-                    } else if (sizeBytes < 1024 * 1024) {
-                      sizeLabel = '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
-                    } else {
-                      sizeLabel = '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-                    }
-                  }
-                  
-                  // Get material URL - handle multiple possible field names
-                  String materialUrl = materialJson['url'] as String? ?? 
-                                     materialJson['file'] as String? ?? 
-                                     materialJson['attachment'] as String? ?? 
-                                     materialJson['file_url'] as String? ?? 
-                                     '';
-                  
-                  // Ensure URL is properly formatted
-                  if (materialUrl.isNotEmpty) {
-                    // If it's a relative path, prepend base URL
-                    if (!materialUrl.startsWith('http://') && 
-                        !materialUrl.startsWith('https://')) {
-                      // Ensure it starts with /
-                      if (!materialUrl.startsWith('/')) {
-                        materialUrl = '/$materialUrl';
-                      }
-                      materialUrl = '${ApiClient.baseUrl}$materialUrl';
-                    }
-                    debugPrint('   📎 Material URL: $materialUrl');
-                  } else {
-                    debugPrint('   ⚠️ Material "${materialJson['name']}" has no URL');
-                  }
-                  
-                  final material = CourseMaterial(
-                    id: materialJson['id']?.toString(),
-                    courseId: courseId,
-                    name: materialJson['name'] as String? ?? 'Untitled Material',
-                    url: materialUrl,
-                    sizeBytes: sizeBytes,
-                    sizeLabel: sizeLabel,
-                    fileType: materialJson['file_type'] as String? ?? 'pdf',
-                    uploadedAt: uploadedAt,
-                  );
-                  
-                  materials.add(material);
-                  debugPrint('✅ Added material: ${material.name} (Course ID: $courseId)');
-                } catch (e, stackTrace) {
-                  debugPrint('❌ Error parsing material at index $i: $e');
-                  debugPrint('   Stack trace: $stackTrace');
-                  debugPrint('   Material data: ${materialsJson[i]}');
+              int? sizeBytes;
+              if (materialJson['size_bytes'] != null) {
+                if (materialJson['size_bytes'] is int) {
+                  sizeBytes = materialJson['size_bytes'] as int;
+                } else if (materialJson['size_bytes'] is String) {
+                  sizeBytes = int.tryParse(materialJson['size_bytes'] as String);
                 }
               }
               
-              debugPrint('✅ Successfully fetched ${materials.length} materials from API');
-              return materials;
+              DateTime? uploadedAt;
+              if (materialJson['uploaded_at'] != null) {
+                try {
+                  uploadedAt = DateTime.parse(materialJson['uploaded_at'] as String);
+                } catch (e) {}
+              }
+              
+              String? sizeLabel = materialJson['size_label'] as String?;
+              if (sizeLabel == null && sizeBytes != null) {
+                if (sizeBytes < 1024) {
+                  sizeLabel = '$sizeBytes B';
+                } else if (sizeBytes < 1024 * 1024) {
+                  sizeLabel = '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
+                } else {
+                  sizeLabel = '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+                }
+              }
+              
+              String materialUrl = materialJson['url'] as String? ?? 
+                                 materialJson['file'] as String? ?? 
+                                 materialJson['attachment'] as String? ?? 
+                                 materialJson['file_url'] as String? ?? 
+                                 '';
+              
+              if (materialUrl.isNotEmpty && 
+                  !materialUrl.startsWith('http://') && 
+                  !materialUrl.startsWith('https://')) {
+                materialUrl = '${ApiClient.baseUrl}${materialUrl.startsWith('/') ? materialUrl : '/$materialUrl'}';
+              }
+              
+              materials.add(CourseMaterial(
+                id: materialJson['id']?.toString(),
+                courseId: courseId,
+                name: materialJson['name'] as String? ?? 'Untitled Material',
+                url: materialUrl,
+                sizeBytes: sizeBytes,
+                sizeLabel: sizeLabel,
+                fileType: materialJson['file_type'] as String? ?? 'pdf',
+                uploadedAt: uploadedAt,
+              ));
+            } catch (e) {
+              debugPrint('⚠️ Error parsing material: $e');
             }
           }
-          
-          debugPrint('⚠️ No materials found in API response');
-          return [];
-        } catch (e, stackTrace) {
-          debugPrint('❌ JSON decode error for materials: $e');
-          debugPrint('   Stack trace: $stackTrace');
-          return [];
+          return materials;
         }
-      } else {
-        debugPrint('❌ Materials API request failed: ${response.statusCode}');
-        return [];
       }
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error fetching materials: $e');
-      debugPrint('   Stack trace: $stackTrace');
+      return [];
+    } catch (e) {
+      debugPrint('❌ Material fetch failed: $e');
       return [];
     }
   }

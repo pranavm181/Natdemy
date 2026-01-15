@@ -1,3 +1,7 @@
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
 import '../api/contact_service.dart';
 import 'package:flutter/cupertino.dart';
@@ -9,20 +13,20 @@ class AboutPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: CupertinoNavigationBarBackButton(
           onPressed: () => Navigator.of(context).pop(),
-          color: Colors.black,
+          color: AppColors.textPrimary,
         ),
-        title: const Text(
+        title: Text(
           'ABOUT NATDEMY',
-          style: TextStyle(
-            color: Color(0xFF582DB0),
-            fontWeight: FontWeight.w900,
-            fontSize: 20,
+          style: AppTextStyles.headline1.copyWith(
+            color: AppColors.primary,
+            fontSize: 20.sp,
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -30,45 +34,44 @@ class AboutPage extends StatelessWidget {
       body: AppAnimations.fadeSlideIn(
         delay: 100,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: EdgeInsets.symmetric(horizontal: 20.w),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 16),
+              SizedBox(height: 16.h),
               // Logo Section
               Center(
                 child: Column(
                   children: [
                     Image.asset(
                       'assets/images/natdemy_logo2.png',
-                      width: 100,
-                      height: 100,
+                      width: 100.r,
+                      height: 100.r,
                       errorBuilder: (context, error, stackTrace) {
-                        return const Icon(
+                        return Icon(
                           Icons.school,
-                          size: 80,
-                          color: Color(0xFF582DB0),
+                          size: 80.r,
+                          color: AppColors.primary,
                         );
                       },
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
+                    SizedBox(height: 16.h),
+                    Text(
                       'NATDEMY',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF582DB0),
-                        letterSpacing: 1.2,
+                      style: AppTextStyles.headline1.copyWith(
+                        fontSize: 32.sp,
+                        color: AppColors.primary,
+                        letterSpacing: 1.2.w,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
+                    SizedBox(height: 8.h),
+                    Text(
                       'Any Time Any Where',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1E293B),
-                        letterSpacing: 0.5,
+                      style: AppTextStyles.body1.copyWith(
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        letterSpacing: 0.5.w,
                       ),
                     ),
                   ],
@@ -143,22 +146,21 @@ class AboutPage extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF000000),
-            letterSpacing: 0.5,
+          style: AppTextStyles.headline2.copyWith(
+            fontSize: 24.sp,
+            color: AppColors.textPrimary,
+            letterSpacing: 0.5.w,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8.h),
         Container(
-          height: 3,
-          width: 120,
+          height: 3.h,
+          width: 120.w,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+            gradient: LinearGradient(
+              colors: [AppColors.primary, AppColors.primaryLight],
             ),
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(2.r),
           ),
         ),
       ],
@@ -168,12 +170,12 @@ class AboutPage extends StatelessWidget {
   Widget _buildSectionContent(String content) {
     return Text(
       content,
-      style: const TextStyle(
-        fontSize: 16,
+      style: AppTextStyles.body1.copyWith(
+        fontSize: 16.sp,
         height: 1.8,
-        color: Color(0xFF1E293B),
+        color: AppColors.textPrimary,
         fontWeight: FontWeight.w600,
-        letterSpacing: 0.3,
+        letterSpacing: 0.3.w,
       ),
     );
   }
@@ -191,40 +193,40 @@ class AboutPage extends StatelessWidget {
         final index = entry.key;
         final feature = entry.value;
         return Padding(
-          padding: EdgeInsets.only(bottom: index < features.length - 1 ? 20 : 0),
+          padding: EdgeInsets.only(bottom: index < features.length - 1 ? 20.h : 0),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.only(top: 2),
+                padding: EdgeInsets.only(top: 2.h),
                 child: Icon(
                   feature['icon'] as IconData,
-                  color: const Color(0xFFA1C95C),
-                  size: 22,
+                  color: AppColors.accent,
+                  size: 22.r,
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: 16.w),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       feature['title'] as String,
-                      style: const TextStyle(
-                        fontSize: 16,
+                      style: AppTextStyles.body1.copyWith(
+                        fontSize: 16.sp,
                         height: 1.7,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1E293B),
-                        letterSpacing: 0.2,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        letterSpacing: 0.2.w,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4.h),
                     Text(
                       feature['desc'] as String,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
+                      style: AppTextStyles.caption.copyWith(
+                        fontSize: 14.sp,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -264,35 +266,35 @@ class AboutPage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(top: 2),
+          padding: EdgeInsets.only(top: 2.h),
           child: Icon(
             icon,
-            color: const Color(0xFFA1C95C),
-            size: 22,
+            color: AppColors.accent,
+            size: 22.r,
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: 16.w),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  fontSize: 16,
+                style: AppTextStyles.body1.copyWith(
+                  fontSize: 16.sp,
                   height: 1.7,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1E293B),
-                  letterSpacing: 0.2,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: 0.2.w,
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 4.h),
               Text(
                 value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF64748B),
-                  fontWeight: FontWeight.w500,
+                style: AppTextStyles.caption.copyWith(
+                  fontSize: 14.sp,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],

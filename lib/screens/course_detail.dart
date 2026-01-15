@@ -1,3 +1,7 @@
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -10,11 +14,80 @@ import '../api/course_service.dart';
 import '../widgets/rating_stars.dart';
 import '../data/course_stream.dart';
 import '../utils/animations.dart';
+import '../widgets/shimmer_loading.dart';
+import '../utils/haptic_feedback.dart';
 
-class CourseDetailPage extends StatelessWidget {
+class CourseDetailPage extends StatefulWidget {
   const CourseDetailPage({super.key, required this.course});
 
   final Course course;
+
+  @override
+  State<CourseDetailPage> createState() => _CourseDetailPageState();
+}
+
+class _CourseDetailPageState extends State<CourseDetailPage> {
+  bool _isLoading = false;
+  String? _errorMessage;
+  List<CourseStream> _streams = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    // If streams are already cached, use them but still allow refresh if needed
+    final cached = CourseService.cachedStreams.where((s) => 
+      s.resolvedCourseId == widget.course.id || 
+      s.courseId == widget.course.id || 
+      (s.course?.id == widget.course.id)
+    ).toList();
+
+    if (cached.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          _streams = cached;
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+
+    try {
+      // fetchCourses also populates cachedStreams
+      await CourseService.fetchCourses();
+      
+      final updatedStreams = CourseService.cachedStreams.where((s) => 
+        s.resolvedCourseId == widget.course.id || 
+        s.courseId == widget.course.id || 
+        (s.course?.id == widget.course.id)
+      ).toList();
+
+      if (mounted) {
+        setState(() {
+          _streams = updatedStreams;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading course details: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load additional course details.';
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   // Get icon for stream based on stream name or index
   IconData _getStreamIcon(String streamName, int index) {
@@ -58,40 +131,25 @@ class CourseDetailPage extends StatelessWidget {
     return defaultIcons[index % defaultIcons.length];
   }
 
-
   @override
   Widget build(BuildContext context) {
-    final relatedStreams = CourseService.cachedStreams
-        .where((stream) {
-          // Check multiple ways course_id might be stored
-          if (stream.resolvedCourseId == course.id) {
-            return true;
-          }
-          if (stream.courseId == course.id) {
-            return true;
-          }
-          if (stream.course?.id == course.id) {
-            return true;
-          }
-          return false;
-        })
-        .toList();
+    final course = widget.course;
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: CupertinoNavigationBarBackButton(
           onPressed: () => Navigator.of(context).pop(),
-          color: Colors.black,
+          color: AppColors.textPrimary,
         ),
-        title: const Text(
+        title: Text(
           'COURSE DETAILS',
-          style: TextStyle(
-            color: Color(0xFF582DB0),
-            fontWeight: FontWeight.w900,
-            fontSize: 20,
+          style: AppTextStyles.headline1.copyWith(
+            color: AppColors.primary,
+            fontSize: 20.sp,
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -102,26 +160,26 @@ class CourseDetailPage extends StatelessWidget {
           children: [
             AppAnimations.scaleIn(
               delay: 150,
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: Container(
+                margin: EdgeInsets.all(16.r),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(20.r),
               border: Border.all(
-                color: const Color(0xFF582DB0),
-                width: 2,
+                color: AppColors.primary,
+                width: 2.r,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                  offset: const Offset(0, 8),
+                  color: AppColors.shadow,
+                  blurRadius: 20.r,
+                  spreadRadius: 2.r,
+                  offset: Offset(0, 8.h),
                 ),
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.all(24.r),
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -134,17 +192,17 @@ class CourseDetailPage extends StatelessWidget {
                       children: [
                         course.thumbnailUrl != null && course.thumbnailUrl!.isNotEmpty
                             ? ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(8.r),
                                 child: CachedNetworkImage(
                                   imageUrl: CourseService.getFullImageUrl(course.thumbnailUrl),
-                                  width: 64,
-                                  height: 64,
+                                  width: 64.w,
+                                  height: 64.h,
                                   fit: BoxFit.cover,
                                   errorWidget: (context, url, error) {
                                     return Icon(
                                       CourseUtils.getCourseIcon(course.title),
-                                      color: const Color(0xFF000000),
-                                      size: 48,
+                                      color: AppColors.textPrimary,
+                                      size: 48.r,
                                     );
                                   },
                                   memCacheWidth: 128,
@@ -153,28 +211,27 @@ class CourseDetailPage extends StatelessWidget {
                               )
                             : Icon(
                                 CourseUtils.getCourseIcon(course.title),
-                                color: const Color(0xFF000000),
-                                size: 48,
+                                color: AppColors.textPrimary,
+                                size: 48.r,
                               ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: 16.h),
                         Text(
                           course.title,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Color(0xFF000000),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 24,
+                          style: AppTextStyles.headline1.copyWith(
+                            color: AppColors.textPrimary,
+                            fontSize: 24.sp,
                             fontStyle: FontStyle.italic,
                           ),
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12.h),
                         RatingStars(
                           rating: course.rating,
-                          textStyle: const TextStyle(
-                            color: Color(0xFF582DB0),
-                            fontSize: 13,
+                          textStyle: AppTextStyles.caption.copyWith(
+                            color: AppColors.primary,
+                            fontSize: 13.sp,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -188,88 +245,119 @@ class CourseDetailPage extends StatelessWidget {
             ),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: EdgeInsets.symmetric(horizontal: 20.w),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16.h),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'ABOUT THIS COURSE',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              color: const Color(0xFF000000),
-                              fontSize: 24,
-                              letterSpacing: 0.5,
-                            ),
+                        style: AppTextStyles.headline2.copyWith(
+                          color: AppColors.textPrimary,
+                          fontSize: 24.sp,
+                          letterSpacing: 0.5,
+                        ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8.h),
                       Container(
-                        height: 3,
-                        width: 120,
+                        height: 3.h,
+                        width: 120.w,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                          gradient: LinearGradient(
+                            colors: [AppColors.primary, AppColors.primaryLight],
                           ),
-                          borderRadius: BorderRadius.circular(2),
+                          borderRadius: BorderRadius.circular(2.r),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20.h),
                   Text(
                     course.description,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: const Color(0xFF1E293B),
-                          height: 1.8,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.3,
-                        ),
+                    style: AppTextStyles.body1.copyWith(
+                      color: AppColors.textPrimary,
+                      height: 1.8,
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
                   ),
-                  const SizedBox(height: 40),
-                  if (relatedStreams.isNotEmpty) ...[
+                  SizedBox(height: 40.h),
+                  if (_isLoading) ...[
                     Text(
                       'COURSE STREAMS',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            color: const Color(0xFF000000),
-                            fontSize: 24,
-                            letterSpacing: 0.5,
-                          ),
+                      style: AppTextStyles.headline2.copyWith(
+                        color: AppColors.textPrimary,
+                        fontSize: 24.sp,
+                        letterSpacing: 0.5,
+                      ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16.h),
                     SizedBox(
-                      height: 150,
+                      height: 150.h,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
-                        itemCount: relatedStreams.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 16),
+                        itemCount: 3,
+                        separatorBuilder: (_, __) => SizedBox(width: 16.w),
+                        itemBuilder: (context, index) => ShimmerLoading.rectangular(
+                          width: 220.w,
+                          height: 150.h,
+                          borderRadius: 20.r,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 32.h),
+                  ] else if (_errorMessage != null && _streams.isEmpty) ...[
+                    // Just show error if we can't load streams
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8.h),
+                      child: Text(
+                        _errorMessage!,
+                        style: AppTextStyles.caption.copyWith(color: AppColors.error),
+                      ),
+                    ),
+                  ] else if (_streams.isNotEmpty) ...[
+                    Text(
+                      'COURSE STREAMS',
+                      style: AppTextStyles.headline2.copyWith(
+                        color: AppColors.textPrimary,
+                        fontSize: 24.sp,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    SizedBox(height: 16.h),
+                    SizedBox(
+                      height: 150.h,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _streams.length,
+                        separatorBuilder: (_, __) => SizedBox(width: 16.w),
                         itemBuilder: (context, index) {
-                          final stream = relatedStreams[index];
+                          final stream = _streams[index];
                           final streamCourse = stream.course ?? course;
                           final streamIcon = _getStreamIcon(stream.name, index);
 
                           return AnimatedListItem(
                             index: index,
                             child: Container(
-                            width: 220,
+                            width: 220.w,
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFF582DB0), width: 2),
-                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20.r),
+                              border: Border.all(color: AppColors.primary, width: 2.r),
+                              color: AppColors.surface,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 6),
+                                  color: AppColors.shadow,
+                                  blurRadius: 12.r,
+                                  offset: Offset(0, 6.h),
                                 ),
                               ],
                             ),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
                             child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,24 +365,24 @@ class CourseDetailPage extends StatelessWidget {
                                   Row(
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.all(8),
+                                        padding: EdgeInsets.all(8.r),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF582DB0).withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(10),
+                                          color: AppColors.primary.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(10.r),
                                         ),
                                         child: Icon(
                                           streamIcon,
-                                          color: const Color(0xFF582DB0),
-                                          size: 24,
+                                          color: AppColors.primary,
+                                          size: 24.r,
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
+                                      SizedBox(width: 8.w),
                                       Expanded(
                                         child: Text(
                                           streamCourse?.title ?? course.title,
-                                          style: const TextStyle(
-                                            color: Color(0xFF475569),
-                                            fontSize: 14,
+                                          style: AppTextStyles.caption.copyWith(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 14.sp,
                                             fontWeight: FontWeight.w600,
                                           ),
                                           maxLines: 1,
@@ -303,16 +391,16 @@ class CourseDetailPage extends StatelessWidget {
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 12),
+                                  SizedBox(height: 12.h),
                                         Text(
                                           stream.name,
-                                          style: const TextStyle(
-                                            color: Color(0xFF582DB0),
+                                          style: AppTextStyles.body1.copyWith(
+                                            color: AppColors.primary,
                                             fontWeight: FontWeight.w800,
-                                            fontSize: 18,
+                                            fontSize: 18.sp,
                                           ),
                                     maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
+                                               overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
@@ -322,18 +410,18 @@ class CourseDetailPage extends StatelessWidget {
                         },
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32.h),
                   ],
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16.h),
                   Card(
                     elevation: 8,
-                    shadowColor: Colors.black.withOpacity(0.15),
+                    shadowColor: AppColors.shadow,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: const BorderSide(color: Color(0xFF582DB0), width: 2),
+                      borderRadius: BorderRadius.circular(16.r),
+                      side: BorderSide(color: AppColors.primary, width: 2.r),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                      padding: EdgeInsets.symmetric(vertical: 20.h, horizontal: 16.w),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
@@ -359,20 +447,20 @@ class CourseDetailPage extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20.h),
                 ],
               ),
             ),
           ),
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 20.h),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
+                  color: AppColors.shadow,
+                  blurRadius: 10.r,
+                  offset: Offset(0, -2.h),
                 ),
               ],
             ),
@@ -380,6 +468,13 @@ class CourseDetailPage extends StatelessWidget {
               child: FutureBuilder(
                 future: ContactService.getContactInfo(),
                 builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return ShimmerLoading.rectangular(
+                      height: 56.h,
+                      width: double.infinity,
+                      borderRadius: 12.r,
+                    );
+                  }
                   final contactInfo = snapshot.data ?? ContactInfo.getDefault();
                   final whatsappNum = _resolveCourseWhatsAppNumber(course, contactInfo);
                   final displayNumber = _formatWhatsAppDisplay(whatsappNum);
@@ -397,94 +492,93 @@ class CourseDetailPage extends StatelessWidget {
                           builder: (sheetContext) {
                             return SafeArea(
                               child: Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(24),
+                                    borderRadius: BorderRadius.circular(24.r),
                                     border: Border.all(
-                                      color: const Color(0xFF582DB0),
-                                      width: 2,
+                                      color: AppColors.primary,
+                                      width: 2.r,
                                     ),
-                                    gradient: const LinearGradient(
+                                    gradient: LinearGradient(
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                       colors: [
-                                        Color(0xFFF5F0FF),
-                                        Color(0xFFFFFFFF),
+                                        AppColors.surface,
+                                        AppColors.background,
                                       ],
                                     ),
-                                    boxShadow: const [
+                                    boxShadow: [
                                       BoxShadow(
-                                        color: Color(0x33582DB0),
-                                        blurRadius: 24,
-                                        offset: Offset(0, 12),
+                                        color: AppColors.primary.withOpacity(0.2),
+                                        blurRadius: 24.r,
+                                        offset: Offset(0, 12.h),
                                       ),
                                     ],
                                   ),
                                   child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                                    padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 24.h),
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Center(
                                           child: Container(
-                                            width: 48,
-                                            height: 5,
+                                            width: 48.w,
+                                            height: 5.h,
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFFBFA5ED),
-                                              borderRadius: BorderRadius.circular(3),
+                                              color: AppColors.primary.withOpacity(0.2),
+                                              borderRadius: BorderRadius.circular(3.r),
                                             ),
                                           ),
                                         ),
-                                        const SizedBox(height: 20),
+                                        SizedBox(height: 20.h),
                                         Row(
                                           children: [
                                             Container(
-                                              width: 52,
-                                              height: 52,
+                                              width: 52.r,
+                                              height: 52.r,
                                               decoration: BoxDecoration(
                                                 shape: BoxShape.circle,
                                                 gradient: const LinearGradient(
                                                   colors: [
-                                                    Color(0xFF4D23AA),
-                                                    Color(0xFF6435C8),
+                                                    AppColors.primary,
+                                                    AppColors.primaryLight,
                                                   ],
                                                 ),
-                                                boxShadow: const [
+                                                boxShadow: [
                                                   BoxShadow(
-                                                    color: Color(0x40582DB0),
-                                                    blurRadius: 20,
-                                                    offset: Offset(0, 8),
+                                                    color: AppColors.primary.withOpacity(0.3),
+                                                    blurRadius: 20.r,
+                                                    offset: Offset(0, 8.h),
                                                   ),
                                                 ],
                                               ),
-                                              child: const Icon(
+                                              child: Icon(
                                                 Icons.headset_mic,
                                                 color: Colors.white,
-                                                size: 26,
+                                                size: 26.r,
                                               ),
                                             ),
-                                            const SizedBox(width: 16),
+                                            SizedBox(width: 16.w),
                                             Expanded(
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: const [
+                                                children: [
                                                   Text(
                                                     'Need help with this course?',
-                                                    style: TextStyle(
-                                                      fontSize: 20,
-                                                      fontWeight: FontWeight.w800,
-                                                      color: Color(0xFF582DB0),
+                                                    style: AppTextStyles.headline2.copyWith(
+                                                      fontSize: 20.sp,
+                                                      color: AppColors.primary,
                                                     ),
                                                   ),
-                                                  SizedBox(height: 6),
+                                                  SizedBox(height: 6.h),
                                                   Text(
                                                     'Our team is ready on WhatsApp or call to answer any questions.',
-                                                    style: TextStyle(
-                                                      fontSize: 14,
+                                                    style: AppTextStyles.body2.copyWith(
+                                                      fontSize: 14.sp,
                                                       height: 1.5,
-                                                      color: Color(0xFF4C3B82),
+                                                      color: AppColors.textPrimary,
                                                       fontWeight: FontWeight.w600,
                                                     ),
                                                   ),
@@ -492,79 +586,82 @@ class CourseDetailPage extends StatelessWidget {
                                               ),
                                             ),
                                             IconButton(
-                                              icon: const Icon(Icons.close_rounded, color: Color(0xFF582DB0)),
+                                              icon: Icon(Icons.close_rounded, color: AppColors.primary, size: 24.r),
                                               tooltip: 'Close',
                                               onPressed: () => Navigator.of(sheetContext).pop(),
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 24),
+                                        SizedBox(height: 24.h),
                                         Container(
-                                          padding: const EdgeInsets.all(16),
+                                          padding: EdgeInsets.all(16.r),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFFF0E8FF),
-                                            borderRadius: BorderRadius.circular(18),
+                                            color: AppColors.primary.withOpacity(0.05),
+                                            borderRadius: BorderRadius.circular(18.r),
                                             border: Border.all(
-                                              color: const Color(0xFFD4C6FF),
-                                              width: 1.2,
+                                              color: AppColors.primary.withOpacity(0.2),
+                                              width: 1.2.r,
                                             ),
                                           ),
                                           child: Row(
                                             children: [
-                                              const Icon(
+                                              Icon(
                                                 Icons.school_rounded,
-                                                color: Color(0xFF582DB0),
+                                                color: AppColors.primary,
+                                                size: 24.r,
                                               ),
-                                              const SizedBox(width: 12),
+                                              SizedBox(width: 12.w),
                                               Expanded(
                                                 child: Text(
                                                   'Course: ${course.title}',
-                                                  style: const TextStyle(
-                                                    color: Color(0xFF452D8A),
+                                                  style: AppTextStyles.body1.copyWith(
+                                                    color: AppColors.primary,
                                                     fontWeight: FontWeight.w700,
+                                                    fontSize: 14.sp,
                                                   ),
                                                 ),
                                               ),
                                             ],
                                           ),
                                         ),
-                                        const SizedBox(height: 28),
+                                        SizedBox(height: 28.h),
                                         Row(
                                           children: [
                                             Container(
-                                              padding: const EdgeInsets.all(10),
+                                              padding: EdgeInsets.all(10.r),
                                               decoration: BoxDecoration(
                                                 color: const Color(0xFFE8F9ED),
-                                                borderRadius: BorderRadius.circular(14),
+                                                borderRadius: BorderRadius.circular(14.r),
                                                 border: Border.all(
                                                   color: const Color(0xFFBFEFCF),
-                                                  width: 1.2,
+                                                  width: 1.2.r,
                                                 ),
                                               ),
-                                              child: const Icon(
+                                              child: Icon(
                                                 Icons.phone_android,
-                                                color: Color(0xFF25D366),
+                                                color: AppColors.whatsapp,
+                                                size: 24.r,
                                               ),
                                             ),
-                                            const SizedBox(width: 12),
+                                            SizedBox(width: 12.w),
                                             Expanded(
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
                                                     supportLabel,
-                                                    style: const TextStyle(
-                                                      color: Color(0xFF452D8A),
+                                                    style: AppTextStyles.body1.copyWith(
+                                                      color: AppColors.primary,
                                                       fontWeight: FontWeight.w700,
-                                                      fontSize: 14,
+                                                      fontSize: 14.sp,
                                                     ),
                                                   ),
-                                                  const SizedBox(height: 4),
+                                                  SizedBox(height: 4.h),
                                                   Text(
                                                     displayNumber,
-                                                    style: const TextStyle(
-                                                      color: Color(0xFF111827),
-                                                      fontSize: 16,
+                                                    style: AppTextStyles.headline1.copyWith(
+                                                      color: AppColors.textPrimary,
+                                                      fontSize: 16.sp,
                                                       fontWeight: FontWeight.w800,
                                                     ),
                                                   ),
@@ -573,25 +670,25 @@ class CourseDetailPage extends StatelessWidget {
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 24),
+                                        SizedBox(height: 24.h),
                                         SizedBox(
                                           width: double.infinity,
-                                          child: ElevatedButton.icon(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFF25D366),
+                                          child: FilledButton.icon(
+                                            style: FilledButton.styleFrom(
+                                              backgroundColor: AppColors.whatsapp,
                                               foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(vertical: 16),
+                                              padding: EdgeInsets.symmetric(vertical: 16.h),
                                               shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(16),
+                                                borderRadius: BorderRadius.circular(16.r),
                                               ),
                                               elevation: 4,
                                             ),
-                                            icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 20),
+                                            icon: FaIcon(FontAwesomeIcons.whatsapp, size: 20.r),
                                             label: Text(
                                               'WhatsApp ($displayNumber)',
-                                              style: const TextStyle(
+                                              style: AppTextStyles.button.copyWith(
                                                 fontWeight: FontWeight.w800,
-                                                fontSize: 16,
+                                                fontSize: 16.sp,
                                               ),
                                             ),
                                             onPressed: () async {
@@ -603,15 +700,15 @@ class CourseDetailPage extends StatelessWidget {
                                             },
                                           ),
                                         ),
-                                        const SizedBox(height: 24),
+                                        SizedBox(height: 24.h),
                                         Container(
                                           width: double.infinity,
-                                          padding: const EdgeInsets.all(14),
+                                          padding: EdgeInsets.all(14.r),
                                           decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(16),
+                                            color: AppColors.surface,
+                                            borderRadius: BorderRadius.circular(16.r),
                                             border: Border.all(
-                                              color: const Color(0xFFE0D2FF),
+                                              color: AppColors.primary.withOpacity(0.1),
                                               width: 1,
                                             ),
                                           ),
@@ -619,35 +716,35 @@ class CourseDetailPage extends StatelessWidget {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Container(
-                                                padding: const EdgeInsets.all(8),
+                                                padding: EdgeInsets.all(8.r),
                                                 decoration: BoxDecoration(
-                                                  color: const Color(0xFFEEE4FF),
-                                                  borderRadius: BorderRadius.circular(12),
+                                                  color: AppColors.primary.withOpacity(0.1),
+                                                  borderRadius: BorderRadius.circular(12.r),
                                                 ),
-                                                child: const Icon(
+                                                child: Icon(
                                                   Icons.info_outline,
-                                                  color: Color(0xFF582DB0),
-                                                  size: 20,
+                                                  color: AppColors.primary,
+                                                  size: 20.r,
                                                 ),
                                               ),
-                                              const SizedBox(width: 12),
+                                              SizedBox(width: 12.w),
                                               Expanded(
                                                 child: Column(
                                                   crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: const [
+                                                  children: [
                                                     Text(
                                                       'Service Hours',
-                                                      style: TextStyle(
+                                                      style: AppTextStyles.body1.copyWith(
                                                         fontWeight: FontWeight.w700,
-                                                        color: Color(0xFF452D8A),
+                                                        color: AppColors.primary,
                                                       ),
                                                     ),
-                                                    SizedBox(height: 4),
+                                                    SizedBox(height: 4.h),
                                                     Text(
                                                       'Mon - Sat · 9:00 AM to 6:00 PM',
-                                                      style: TextStyle(
-                                                        color: Color(0xFF5B4A9B),
-                                                        fontSize: 13,
+                                                      style: AppTextStyles.caption.copyWith(
+                                                        color: AppColors.textSecondary,
+                                                        fontSize: 13.sp,
                                                         fontWeight: FontWeight.w600,
                                                       ),
                                                     ),
@@ -666,17 +763,17 @@ class CourseDetailPage extends StatelessWidget {
                           },
                         );
                       },
-                      icon: const Icon(Icons.headset_mic, size: 20),
-                      label: const Text(
+                      icon: Icon(Icons.headset_mic, size: 20.r),
+                      label: Text(
                         'Contact',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                        style: AppTextStyles.button.copyWith(fontSize: 16.sp, fontWeight: FontWeight.w700),
                       ),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        side: const BorderSide(color: Color(0xFF582DB0), width: 2),
-                        foregroundColor: const Color(0xFF582DB0),
+                        padding: EdgeInsets.symmetric(vertical: 18.h),
+                        side: BorderSide(color: AppColors.primary, width: 2.r),
+                        foregroundColor: AppColors.primary,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(12.r),
                         ),
                       ),
                     ),
@@ -694,23 +791,22 @@ class CourseDetailPage extends StatelessWidget {
   Widget _buildStatItem(IconData icon, String value, String label) {
     return Column(
       children: [
-        Icon(icon, color: const Color(0xFF582DB0), size: 32),
-        const SizedBox(height: 12),
+        Icon(icon, color: AppColors.primary, size: 32.r),
+        SizedBox(height: 12.h),
         Text(
           value,
-          style: const TextStyle(
-            color: Color(0xFF000000),
-            fontWeight: FontWeight.w900,
-            fontSize: 22,
+          style: AppTextStyles.headline2.copyWith(
+            color: AppColors.textPrimary,
+            fontSize: 22.sp,
             letterSpacing: 0.5,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8.h),
         Text(
           label,
-          style: const TextStyle(
-            color: Color(0xFF1E293B),
-            fontSize: 15,
+          style: AppTextStyles.body2.copyWith(
+            color: AppColors.textSecondary,
+            fontSize: 15.sp,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.3,
           ),

@@ -6,6 +6,7 @@ import '../data/course_catalog.dart';
 import '../data/course_stream.dart';
 import 'api_client.dart';
 import '../utils/json_parser.dart';
+import 'home_service.dart';
 
 class CourseService {
   static List<CourseStream> _cachedStreams = [];
@@ -126,132 +127,80 @@ class CourseService {
       }
     }
     try {
-      debugPrint('🔄 Fetching courses from API...');
-      final response = await ApiClient.get('/api/home/', queryParams: {'format': 'json'}, includeAuth: false);
+      debugPrint('🔄 Fetching courses from HomeService...');
+      final data = await HomeService.fetchHomeData(forceRefresh: forceRefresh);
       
-      debugPrint('📡 API Response Status: ${response.statusCode}');
-      
-      // Check if response is HTML (error page) instead of JSON
-      final isHtml = response.body.trim().startsWith('<!DOCTYPE') || 
-                     response.body.trim().startsWith('<html') ||
-                     response.body.trim().startsWith('<HTML');
-      
-      if (isHtml) {
-        debugPrint('⚠️ API returned HTML error page (status: ${response.statusCode}) - using fallback courses');
-        throw Exception('Server error: ${response.statusCode}');
-      }
-      
-      if (response.statusCode == 200) {
-        try {
-          // Parse JSON in background thread to avoid blocking UI
-          final Map<String, dynamic> data = await JsonParser.parseJson(response.body);
-          debugPrint('✅ JSON decoded successfully');
-          debugPrint('📦 Response keys: ${data.keys.toList()}');
-          
-          if (data.containsKey('data') && data['data'] is Map) {
-            final dataMap = data['data'] as Map<String, dynamic>;
-            debugPrint('📦 Data keys: ${dataMap.keys.toList()}');
+      if (data.containsKey('data') && data['data'] is Map) {
+        final dataMap = data['data'] as Map<String, dynamic>;
 
-            // Parse streams if available
-            if (dataMap.containsKey('streams') && dataMap['streams'] is List) {
-              final streamsJson = dataMap['streams'] as List;
-              _cachedStreams = streamsJson
-                  .whereType<Map<String, dynamic>>()
-                  .map((streamJson) {
-                    try {
-                      return CourseStream.fromJson(streamJson);
-                    } catch (e) {
-                      debugPrint('⚠️ Error parsing stream: $e');
-                      return null;
-                    }
-                  })
-                  .whereType<CourseStream>()
-                  .toList();
-              debugPrint('🌊 Loaded ${_cachedStreams.length} stream(s) from API');
-            } else {
-              _cachedStreams = [];
-              debugPrint('ℹ️ No streams found in API response');
-            }
-            
-            if (dataMap.containsKey('courses') && dataMap['courses'] is List) {
-              final List<dynamic> coursesJson = dataMap['courses'] as List<dynamic>;
-              debugPrint('📚 Found ${coursesJson.length} courses in API response');
-              
-              final courses = <Course>[];
-              
-              for (var i = 0; i < coursesJson.length; i++) {
+        // Parse streams if available
+        if (dataMap.containsKey('streams') && dataMap['streams'] is List) {
+          final streamsJson = dataMap['streams'] as List;
+          _cachedStreams = streamsJson
+              .whereType<Map<String, dynamic>>()
+              .map((streamJson) {
                 try {
-                  final courseJson = coursesJson[i] as Map<String, dynamic>;
-                  final rawTitle = courseJson['title']?.toString() ?? '';
-                  debugPrint('📖 Parsing course $i: "$rawTitle" (id: ${courseJson['id']})');
-                  
-                  final course = Course.fromJson(courseJson);
-                  
-                  // Skip placeholder/empty courses returned by API
-                  final titleLower = course.title.toLowerCase().trim();
-                  if (titleLower == 'none' || course.title.isEmpty) {
-                    debugPrint('ℹ️ Skipping placeholder course (id: ${course.id})');
-                    continue;
-                  }
-                  
-                  courses.add(course);
-                  debugPrint('✅ Added course: "${course.title}" (ID: ${course.id})');
-                } catch (e, stackTrace) {
-                  debugPrint('❌ Error parsing course at index $i: $e');
-                  debugPrint('   Stack trace: $stackTrace');
-                  debugPrint('   Course data: ${coursesJson[i]}');
+                  return CourseStream.fromJson(streamJson);
+                } catch (e) {
+                  debugPrint('⚠️ Error parsing stream: $e');
+                  return null;
                 }
-              }
-              
-              debugPrint('✅ Successfully fetched ${courses.length} courses from API');
-              
-              // Cache the results (in-memory and persistent)
-              _cachedCourses = courses;
-              _cacheTime = DateTime.now();
-              await _saveCoursesToCache(courses);
-              await _saveStreamsToCache();
-              
-              return courses;
-            } else {
-              debugPrint('⚠️ "courses" key not found or not a List in data');
-              debugPrint('   Available keys: ${dataMap.keys.toList()}');
-            }
-          } else {
-            debugPrint('⚠️ "data" key not found or not a Map');
-            debugPrint('   Top-level keys: ${data.keys.toList()}');
-            _cachedStreams = [];
-          }
+              })
+              .whereType<CourseStream>()
+              .toList();
+          debugPrint('🌊 Loaded ${_cachedStreams.length} stream(s) from HomeService');
+        } else {
+          _cachedStreams = [];
+          debugPrint('ℹ️ No streams found in HomeService response');
+        }
+        
+        if (dataMap.containsKey('courses') && dataMap['courses'] is List) {
+          final List<dynamic> coursesJson = dataMap['courses'] as List<dynamic>;
+          debugPrint('📚 Found ${coursesJson.length} courses in HomeService response');
           
-          debugPrint('⚠️ No courses found in API response');
-          // Return cached courses if available, even if expired
-          if (_cachedCourses != null) {
-            debugPrint('📦 Returning cached courses (API failed)');
-            return _cachedCourses!;
+          final courses = <Course>[];
+          for (var json in coursesJson) {
+            try {
+              final course = Course.fromJson(json as Map<String, dynamic>);
+              // Skip placeholder/empty courses
+              if (course.title.isNotEmpty && course.title.toLowerCase() != 'none') {
+                courses.add(course);
+                debugPrint('✅ Added course: "${course.title}" (ID: ${course.id})');
+              } else {
+                debugPrint('ℹ️ Skipping placeholder course (id: ${course.id})');
+              }
+            } catch (e) {
+              debugPrint('⚠️ Error parsing course: $e');
+            }
           }
-          return [];
-        } catch (e, stackTrace) {
-          debugPrint('❌ JSON decode error: $e');
-          debugPrint('   Stack trace: $stackTrace');
-          debugPrint('   Response body preview: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
-          rethrow;
+          debugPrint('✅ Successfully processed ${courses.length} courses from HomeService');
+          
+          // Cache results
+          _cachedCourses = courses;
+          _cacheTime = DateTime.now();
+          await _saveCoursesToCache(courses);
+          await _saveStreamsToCache();
+          
+          return courses;
+        } else {
+          debugPrint('⚠️ "courses" key not found or not a List in HomeService data');
+          debugPrint('   Available keys: ${dataMap.keys.toList()}');
         }
       } else {
-        // Handle non-200 status codes
-        debugPrint('❌ API request failed: ${response.statusCode}');
-        if (!isHtml) {
-          debugPrint('   Response body preview: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
-        }
-        throw Exception('Failed to load courses: ${response.statusCode}');
+        debugPrint('⚠️ "data" key not found or not a Map in HomeService response');
+        debugPrint('   Top-level keys: ${data.keys.toList()}');
+        _cachedStreams = [];
       }
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error fetching courses: $e');
-      debugPrint('   Stack trace: $stackTrace');
+      debugPrint('⚠️ No courses found in HomeService response');
+      return _cachedCourses ?? []; // Return cached courses if available, even if HomeService failed to provide new ones
+    } catch (e) {
+      debugPrint('❌ Course fetch failed: $e');
       // Return cached courses if available, even on error
       if (_cachedCourses != null) {
-        debugPrint('📦 Returning cached courses (error occurred)');
+        debugPrint('📦 Returning cached courses (error occurred during HomeService fetch)');
         return _cachedCourses!;
       }
-      rethrow;
+      return [];
     }
   }
   

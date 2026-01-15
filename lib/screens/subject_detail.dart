@@ -1,3 +1,7 @@
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -7,6 +11,8 @@ import '../utils/animations.dart';
 import 'materials_page.dart';
 import 'live_upcoming.dart';
 import 'lesson_detail.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../utils/haptic_feedback.dart';
 import 'question_bank_page.dart';
 
 class SubjectDetailPage extends StatefulWidget {
@@ -24,7 +30,7 @@ class SubjectDetailPage extends StatefulWidget {
 }
 
 class _SubjectDetailPageState extends State<SubjectDetailPage> {
-  static const int _lessonChunkSize = 6;
+  static const int _lessonChunkSize = 8;
   late final List<CourseLesson> _lessons;
   late int _visibleLessonCount;
 
@@ -46,24 +52,28 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
       _visibleLessonCount =
           math.min(_visibleLessonCount + _lessonChunkSize, _lessons.length);
     });
+    HapticUtils.lightImpact();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isWeb = kIsWeb;
     final actionColors = [
-      const Color(0xFFE100FF), // Live
-      const Color(0xFF0072FF), // Material
-      const Color(0xFFFF6B6B), // Assignments
-      const Color(0xFF4ECDC4), // Mock Tests
+      [const Color(0xFF6366F1), const Color(0xFF8B5CF6)], // Indigo/Violet - Live
+      [const Color(0xFF3B82F6), const Color(0xFF2DD4BF)], // Blue/Teal - Material
+      [const Color(0xFFF59E0B), const Color(0xFFEF4444)], // Amber/Red - Assignments
+      [const Color(0xFF10B981), const Color(0xFF3B82F6)], // Emerald/Blue - Mock Tests
     ];
 
     final actions = [
-      _ActionItem('Live', Icons.live_tv_outlined, actionColors[0], () {
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LiveUpcomingPage()));
+      _ActionItem('Live', Icons.live_tv_rounded, actionColors[0], () {
+        HapticUtils.mediumImpact();
+        Navigator.of(context).push(BouncePageRoute(builder: (_) => const LiveUpcomingPage()));
       }),
-      _ActionItem('Material', Icons.folder_open_outlined, actionColors[1], () {
+      _ActionItem('Material', Icons.auto_stories_rounded, actionColors[1], () {
+        HapticUtils.mediumImpact();
         Navigator.of(context).push(
-          MaterialPageRoute(
+          BouncePageRoute(
             builder: (_) => MaterialsPage(
               courseTitle: widget.courseTitle ?? widget.chapter.title,
               courseId: widget.chapter.courseId,
@@ -72,11 +82,25 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
           ),
         );
       }),
-      _ActionItem('Assignments', Icons.assignment_outlined, actionColors[2], () {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Assignments coming soon')));
+      _ActionItem('Assignments', Icons.edit_note_rounded, actionColors[2], () {
+        HapticUtils.lightImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Assignments coming soon'),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+          ),
+        );
       }),
-      _ActionItem('Mock Tests', Icons.fact_check_outlined, actionColors[3], () {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mock tests coming soon')));
+      _ActionItem('Mock Tests', Icons.quiz_rounded, actionColors[3], () {
+        HapticUtils.lightImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Mock tests coming soon'),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+          ),
+        );
       }),
     ];
 
@@ -84,188 +108,446 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
     final hasMoreLessons = _visibleLessonCount < _lessons.length;
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        leading: CupertinoNavigationBarBackButton(
-          onPressed: () => Navigator.of(context).pop(),
-          color: Colors.black,
-        ),
-        title: Text(
-          widget.chapter.title.toUpperCase(),
-          style: const TextStyle(
-            color: Color(0xFF582DB0),
-            fontWeight: FontWeight.w900,
-            fontSize: 20,
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-      ),
-      body: AppAnimations.fadeSlideIn(
-        delay: 100,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            AppAnimations.scaleIn(
-              delay: 150,
-              child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: actions.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 2.2,
-            ),
-            itemBuilder: (context, index) {
-              final a = actions[index];
-              return OutlinedButton.icon(
-                onPressed: a.onTap,
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF582DB0), width: 2),
-                  foregroundColor: const Color(0xFF582DB0),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+      backgroundColor: AppColors.background,
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // Enhanced SliverAppBar
+          SliverAppBar(
+            expandedHeight: 120.h,
+            pinned: true,
+            stretch: true,
+            backgroundColor: AppColors.background,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            leading: Padding(
+              padding: EdgeInsets.all(8.r),
+              child: CircleAvatar(
+                backgroundColor: AppColors.surface,
+                child: IconButton(
+                  icon: Icon(Icons.arrow_back_ios_new_rounded, 
+                        color: AppColors.textPrimary, size: 20.r),
+                  onPressed: () {
+                    HapticUtils.lightImpact();
+                    Navigator.of(context).pop();
+                  },
                 ),
-                icon: Icon(a.icon, size: 20),
-                label: Text(
-                  a.label,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                ),
-              );
-            },
-          ),
-          ),
-          const SizedBox(height: 24),
-          Card(
-            elevation: 8,
-            shadowColor: Colors.black.withOpacity(0.15),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: const BorderSide(color: Color(0xFF582DB0), width: 2),
+              ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'LESSONS',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          color: const Color(0xFF000000),
-                          fontSize: 22,
-                          letterSpacing: 0.5,
-                        ),
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: EdgeInsets.only(left: 60.w, bottom: 16.h, right: 16.w),
+              title: Text(
+                widget.chapter.title,
+                style: AppTextStyles.headline3.copyWith(
+                  color: AppColors.textPrimary,
+                  fontSize: 18.sp,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppColors.primary.withOpacity(0.05),
+                      AppColors.background,
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  if (_lessons.isEmpty)
-                    const Text(
-                      'No lessons available yet.',
-                      style: TextStyle(
-                        color: Color(0xFF64748B),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    )
-                  else ...[
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: lessonsToShow.length,
-                      itemBuilder: (context, index) {
-                        final lesson = lessonsToShow[index];
-                        return Card(
-                          elevation: 8,
-                          shadowColor: Colors.black.withOpacity(0.15),
-                          margin: const EdgeInsets.only(bottom: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: const BorderSide(color: Color(0xFF582DB0), width: 2),
-                          ),
-                          child: ListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            leading: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF582DB0).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(Icons.play_circle_outline,
-                                  color: Color(0xFF582DB0), size: 28),
-                            ),
-                            title: Text(
-                              lesson.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF1E293B),
-                                fontSize: 16,
-                              ),
-                            ),
-                            trailing:
-                                const Icon(Icons.chevron_right, color: Color(0xFF582DB0), size: 28),
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => LessonDetailPage(
-                                    lessonName: lesson.title,
-                                    lesson: lesson,
-                                    courseTitle: widget.courseTitle ?? widget.chapter.title,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                    if (hasMoreLessons)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: _loadMoreLessons,
-                          icon: const Icon(Icons.expand_more),
-                          label: const Text('Load more lessons'),
+                ),
+              ),
+            ),
+          ),
+
+          // Action Grid
+          SliverPadding(
+            padding: EdgeInsets.all(16.r),
+            sliver: SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: isWeb ? 4 : 2,
+                mainAxisSpacing: 16.r,
+                crossAxisSpacing: 16.r,
+                childAspectRatio: 1.5,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => AppAnimations.fadeScaleIn(
+                  delay: 100 + (index * 50),
+                  child: _SubjectActionCard(action: actions[index]),
+                ),
+                childCount: actions.length,
+              ),
+            ),
+          ),
+
+          // MCQs Section - Full Width Horizontal
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+              child: AppAnimations.fadeSlideIn(
+                delay: 400,
+                child: GestureDetector(
+                  onTap: () {
+                    HapticUtils.mediumImpact();
+                    Navigator.of(context).push(
+                      BouncePageRoute(
+                        builder: (_) => QuestionBankPage(
+                          chapter: widget.chapter,
+                          courseTitle: widget.courseTitle ?? widget.chapter.title,
                         ),
                       ),
-                  ],
+                    );
+                  },
+                  child: Container(
+                    padding: EdgeInsets.all(20.r),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF7C3AED), Color(0xFFC026D3)],
+                      ),
+                      borderRadius: BorderRadius.circular(20.r),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF7C3AED).withOpacity(0.3),
+                          blurRadius: 12.r,
+                          offset: Offset(0, 6.h),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(12.r),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.library_books_rounded, color: Colors.white, size: 28.r),
+                        ),
+                        SizedBox(width: 20.w),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'MCQs / Question Bank',
+                                style: AppTextStyles.button.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 18.sp,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              SizedBox(height: 4.h),
+                              Text(
+                                'Practice with chapter-wise questions',
+                                style: AppTextStyles.caption.copyWith(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 12.sp,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 20.r),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Lessons Header
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
+              child: Row(
+                children: [
+                  Container(
+                    width: 4.w,
+                    height: 24.h,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(2.r),
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  Text(
+                    'COURSE CURRICULUM',
+                    style: AppTextStyles.title2.copyWith(
+                      letterSpacing: 1.2,
+                      fontSize: 16.sp,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${_lessons.length} Lessons',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: FilledButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => QuestionBankPage(
-                      chapter: widget.chapter,
-                      courseTitle: widget.courseTitle ?? widget.chapter.title,
+
+          // Lessons List
+          if (_lessons.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.auto_stories_outlined, 
+                         size: 64.r, color: AppColors.textSecondary.withOpacity(0.3)),
+                    SizedBox(height: 16.h),
+                    Text(
+                      'No lessons available yet',
+                      style: AppTextStyles.body1.copyWith(color: AppColors.textSecondary),
                     ),
-                  ),
-                );
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF582DB0),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ],
+                ),
               ),
-              icon: const Icon(Icons.help_outline, size: 20),
-              label: const Text(
-                'MCQ',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            )
+          else
+            SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    if (index < lessonsToShow.length) {
+                      final lesson = lessonsToShow[index];
+                      return AppAnimations.slideInBottom(
+                        delay: 200 + (index * 30),
+                        child: _LessonTile(
+                          lesson: lesson,
+                          index: index + 1,
+                          courseTitle: widget.courseTitle ?? widget.chapter.title,
+                        ),
+                      );
+                    } else if (hasMoreLessons) {
+                      return Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24.h),
+                        child: Center(
+                          child: TextButton.icon(
+                            onPressed: _loadMoreLessons,
+                            style: TextButton.styleFrom(
+                              backgroundColor: AppColors.primary.withOpacity(0.1),
+                              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 12.h),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.r)),
+                            ),
+                            icon: const Icon(Icons.add_rounded),
+                            label: Text(
+                              'Show More Lessons',
+                              style: AppTextStyles.button.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    return SizedBox(height: 32.h); // Bottom padding
+                  },
+                  childCount: lessonsToShow.length + (hasMoreLessons ? 1 : 1),
+                ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubjectActionCard extends StatefulWidget {
+  const _SubjectActionCard({required this.action});
+  final _ActionItem action;
+
+  @override
+  State<_SubjectActionCard> createState() => _SubjectActionCardState();
+}
+
+class _SubjectActionCardState extends State<_SubjectActionCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        transform: Matrix4.identity()..scale(_isHovered ? 1.05 : 1.0),
+        child: GestureDetector(
+          onTap: widget.action.onTap,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20.r),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: widget.action.colors,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: widget.action.colors.first.withOpacity(0.3),
+                  blurRadius: 12.r,
+                  offset: Offset(0, 6.h),
+                ),
+              ],
+            ),
+            padding: EdgeInsets.all(16.r),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8.r),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(widget.action.icon, color: Colors.white, size: 24.r),
+                ),
+                Text(
+                  widget.action.label,
+                  style: AppTextStyles.button.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15.sp,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LessonTile extends StatelessWidget {
+  const _LessonTile({
+    required this.lesson,
+    required this.index,
+    required this.courseTitle,
+  });
+
+  final CourseLesson lesson;
+  final int index;
+  final String courseTitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 12.h),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16.r),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadow.withOpacity(0.05),
+            blurRadius: 10.r,
+            offset: const Offset(0, 4),
           ),
         ],
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.05),
+          width: 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: () {
+          HapticUtils.mediumImpact();
+          Navigator.of(context).push(
+            BouncePageRoute(
+              builder: (_) => LessonDetailPage(
+                lessonName: lesson.title,
+                lesson: lesson,
+                courseTitle: courseTitle,
+              ),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(16.r),
+        child: Padding(
+          padding: EdgeInsets.all(16.r),
+          child: Row(
+            children: [
+              // Index / Status indicator
+              Container(
+                width: 44.r,
+                height: 44.r,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Center(
+                  child: Text(
+                    index.toString().padLeft(2, '0'),
+                    style: AppTextStyles.title3.copyWith(
+                      color: AppColors.primary,
+                      fontSize: 16.sp,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 16.w),
+              // Lesson info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      lesson.title,
+                      style: AppTextStyles.body1.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15.sp,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 4.h),
+                    Row(
+                      children: [
+                        Icon(Icons.play_circle_fill_rounded, 
+                             size: 14.r, color: AppColors.textSecondary),
+                        SizedBox(width: 4.w),
+                        Text(
+                          'Video Lesson',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Play button
+              Container(
+                padding: EdgeInsets.all(8.r),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.3),
+                      blurRadius: 8.r,
+                      offset: Offset(0, 2.h),
+                    ),
+                  ],
+                ),
+                child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20.r),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -273,9 +555,10 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
 }
 
 class _ActionItem {
-  const _ActionItem(this.label, this.icon, this.color, this.onTap);
+  const _ActionItem(this.label, this.icon, this.colors, this.onTap);
   final String label;
   final IconData icon;
-  final Color color;
+  final List<Color> colors;
   final VoidCallback onTap;
 }
+

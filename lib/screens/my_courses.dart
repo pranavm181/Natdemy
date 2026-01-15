@@ -1,5 +1,9 @@
-import 'dart:math' as math;
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +15,7 @@ import '../utils/course_utils.dart';
 import '../widgets/rating_stars.dart';
 import '../widgets/main_drawer.dart';
 import '../widgets/theme_loading_indicator.dart';
+import '../widgets/shimmer_loading.dart';
 import '../api/course_service.dart';
 import '../api/contact_service.dart';
 import '../utils/animations.dart';
@@ -37,34 +42,20 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   final ScrollController _coursesScrollController = ScrollController();
   final Map<String, int> _visibleChapterCounts = {};
 
+  late Future<ContactInfo> _contactInfoFuture;
+
   @override
   void initState() {
     super.initState();
     // Removed scroll listener - all chapters are shown by default, no pagination needed
     // Check if app was restarted - if so, clear cache and load fresh
+    _contactInfoFuture = ContactService.getContactInfo();
     _checkAppRestartAndLoad();
   }
 
   Future<void> _checkAppRestartAndLoad() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final appRestarted = prefs.getBool('app_restarted') ?? false;
-      
-      if (appRestarted) {
-        // App was restarted - clear cache and load fresh
-        debugPrint('🔄 App restarted detected - clearing cache and loading fresh data');
-        await prefs.setBool('app_restarted', false); // Reset flag
-        await JoinedCourses.instance.clearCache();
-        _loadCourses(forceRefresh: true);
-      } else {
-        // Normal navigation - load from cache first
-        _loadCourses(forceRefresh: false);
-      }
-    } catch (e) {
-      debugPrint('⚠️ Error checking app restart: $e');
-      // Fallback to normal load
-      _loadCourses(forceRefresh: false);
-    }
+    // Normal navigation - load from cache first
+    _loadCourses(forceRefresh: false);
   }
 
   @override
@@ -322,6 +313,11 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
         _ensureChapterVisibilityForCourse(course);
       }
     });
+
+    // Auto-fetch chapters in background if they are missing
+    if (course.chapters.isEmpty && course.isEnrolled) {
+      _loadChaptersForSelectedCourse();
+    }
   }
 
   @override
@@ -330,34 +326,35 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
 
     if (_isLoading) {
       return Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.background,
           surfaceTintColor: Colors.transparent,
           elevation: 0,
-          title: const Text(
+          title: Text(
             'MY COURSES',
-            style: TextStyle(
-              color: Color(0xFF582DB0),
-              fontWeight: FontWeight.w900,
-              fontSize: 20,
+            style: AppTextStyles.headline1.copyWith(
+              color: AppColors.primary,
+              fontSize: 20.sp,
               fontStyle: FontStyle.italic,
             ),
           ),
         ),
-        body: const Center(
-          child: ThemePulsingDotsIndicator(
-            size: 12.0,
-            spacing: 16.0,
+        body: Center(
+          child: ShimmerLoading(
+            width: 0.9.sw,
+            height: 200.h,
+            borderRadius: 20.r,
           ),
         ),
       );
     }
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       drawer: MainDrawer(
         student: widget.student,
         onNavigateToHome: () {
-          // Navigate to HomeShell if we can find it in the widget tree
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => HomeShell(student: widget.student),
@@ -368,44 +365,35 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
           // Already on My Courses page
         },
         onNavigateToProfile: () {
-          // Navigate to HomeShell and switch to Profile tab
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => HomeShell(student: widget.student),
             ),
           );
-          // Need to switch to profile tab after navigation
-          Future.delayed(const Duration(milliseconds: 100), () {
-            if (context.mounted) {
-              // This will be handled by HomeShell
-            }
-          });
         },
       ),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.black),
+            icon: Icon(Icons.menu, color: AppColors.textPrimary, size: 24.r),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        title: const Text(
+        title: Text(
           'MY COURSES',
-          style: TextStyle(
-            color: Color(0xFF582DB0),
-            fontWeight: FontWeight.w900,
-            fontSize: 20,
+          style: AppTextStyles.headline1.copyWith(
+            color: AppColors.primary,
+            fontSize: 20.sp,
             fontStyle: FontStyle.italic,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFF582DB0)),
+            icon: Icon(Icons.refresh, color: AppColors.primary, size: 24.r),
             onPressed: () async {
-              // Clear cache and load fresh when refresh button is pressed
               await JoinedCourses.instance.clearCache();
               _loadCourses(forceRefresh: true);
             },
@@ -433,11 +421,11 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
               delay: 100,
               child: ListView(
                 controller: _coursesScrollController,
-                padding: EdgeInsets.only(
-                  left: 16,
-                  right: 16,
-                  top: 16,
-                  bottom: MediaQuery.of(context).padding.bottom + 100,
+                padding: EdgeInsets.fromLTRB(
+                  16.w, 
+                  16.h, 
+                  16.w, 
+                  MediaQuery.of(context).padding.bottom + 100.h
                 ),
                 children: [
                   if (_selected != null) ...[
@@ -466,17 +454,24 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
     );
   }
 
-  Widget _emptyView() => const Center(
+  Widget _emptyView() => Center(
     child: Padding(
-      padding: EdgeInsets.all(24),
-      child: Text(
-        'No course joined.',
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF475569),
-        ),
-        textAlign: TextAlign.center,
+      padding: EdgeInsets.all(24.r),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.school_outlined, size: 64.r, color: AppColors.divider),
+          SizedBox(height: 16.h),
+          Text(
+            'No course joined.',
+            style: AppTextStyles.body1.copyWith(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     ),
   );
@@ -487,53 +482,56 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
       return const SizedBox.shrink();
     }
 
-    // Don't load chapters automatically - only load when user wants to view them
+    // Chapters are considered loaded if they are in the tracker OR already present in the course object
     final courseKey = '${selectedCourse.courseId}_${selectedCourse.streamId}';
-    final chaptersLoaded = _loadedChapters.contains(courseKey);
+    final chaptersLoaded = _loadedChapters.contains(courseKey) || selectedCourse.chapters.isNotEmpty;
 
     // Show locked message if course is not enrolled
     if (!selectedCourse.isEnrolled) {
       return Card(
         elevation: 8,
-        shadowColor: Colors.black.withOpacity(0.15),
+        shadowColor: AppColors.shadow,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Colors.orange, width: 2),
+          borderRadius: BorderRadius.circular(16.r),
+          side: BorderSide(color: AppColors.warning, width: 2.r),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          padding: EdgeInsets.all(24.r),
           child: Column(
             children: [
-              const Icon(
+              Icon(
                 Icons.lock_outline,
-                size: 64,
-                color: Colors.orange,
+                size: 64.r,
+                color: AppColors.warning,
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16.h),
               Text(
                 'Course Locked',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: const Color(0xFF000000),
-                      fontSize: 22,
-                    ),
+                style: AppTextStyles.headline1.copyWith(
+                  color: AppColors.textPrimary,
+                  fontSize: 22.sp,
+                ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8.h),
               Text(
                 'Your enrollment is pending approval.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF64748B),
-                      fontSize: 16,
-                    ),
+                style: AppTextStyles.body1.copyWith(
+                  color: AppColors.textSecondary,
+                  fontSize: 16.sp,
+                ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 4.h),
               Text(
                 'You will be able to access this course once your enrollment is confirmed.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFF94A3B8),
-                      fontSize: 14,
-                    ),
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary.withOpacity(0.7),
+                  fontSize: 14.sp,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -554,12 +552,11 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
       children: [
         Text(
           streamTitle.toUpperCase(),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w900,
-                color: const Color(0xFF000000),
-                fontSize: 22,
-                letterSpacing: 0.5,
-              ),
+          style: AppTextStyles.headline2.copyWith(
+            color: AppColors.textPrimary,
+            fontSize: 22.sp,
+            letterSpacing: 0.5,
+          ),
         ),
         const SizedBox(height: 16),
         // Show loading state
@@ -574,29 +571,32 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
         else if (!chaptersLoaded && selectedCourse.courseId != null && selectedCourse.streamId != null)
           Center(
             child: Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: EdgeInsets.all(24.r),
               child: OutlinedButton.icon(
                 onPressed: () {
                   HapticUtils.buttonPress();
                   _loadChaptersForSelectedCourse();
                 },
-                icon: const Icon(Icons.book_outlined),
-                label: const Text('Load Chapters'),
+                icon: Icon(Icons.book_outlined, size: 20.r),
+                label: Text('Load Chapters', style: AppTextStyles.button.copyWith(fontSize: 16.sp, color: AppColors.primary)),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  side: const BorderSide(color: Color(0xFF582DB0), width: 2),
-                  foregroundColor: const Color(0xFF582DB0),
+                  padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 16.h),
+                  side: BorderSide(color: AppColors.primary, width: 2.r),
+                  foregroundColor: AppColors.primary,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                 ),
               ),
             ),
           )
         // Show empty state if chapters loaded but empty
         else if (chapters.isEmpty && chaptersLoaded)
-          const Text(
+          Text(
             'No chapters available for this stream yet.',
-            style: TextStyle(
-              color: Color(0xFF64748B),
-              fontSize: 14,
+            style: AppTextStyles.body2.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 14.sp,
               fontWeight: FontWeight.w500,
             ),
           )
@@ -627,42 +627,42 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
 
               return Card(
                 elevation: 8,
-                shadowColor: Colors.black.withOpacity(0.15),
+                shadowColor: AppColors.shadow,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: Color(0xFF582DB0), width: 2),
+                  borderRadius: BorderRadius.circular(16.r),
+                  side: BorderSide(color: AppColors.primary, width: 2.r),
                 ),
-                margin: const EdgeInsets.only(bottom: 12),
+                margin: EdgeInsets.only(bottom: 12.h),
                 child: ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.book_outlined,
-                    color: Color(0xFF582DB0),
-                    size: 28,
+                    color: AppColors.primary,
+                    size: 28.r,
                   ),
                   title: Text(
                     chapter.title,
-                    style: const TextStyle(
-                      color: Color(0xFF1E293B),
+                    style: AppTextStyles.body1.copyWith(
+                      color: AppColors.textPrimary,
                       fontWeight: FontWeight.w700,
-                      fontSize: 16,
+                      fontSize: 16.sp,
                     ),
                   ),
                   subtitle: subtitleText != null
                       ? Text(
                           subtitleText,
-                          style: const TextStyle(
-                            color: Color(0xFF64748B),
-                            fontSize: 13,
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 13.sp,
                             fontWeight: FontWeight.w500,
                           ),
                         )
                       : null,
-                  trailing: const Icon(
+                  trailing: Icon(
                     Icons.chevron_right,
-                    color: Color(0xFF582DB0),
-                    size: 28,
+                    color: AppColors.primary,
+                    size: 28.r,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                   onTap: () async {
                     HapticUtils.subtleTap();
                     // Ensure chapters are loaded before navigating
@@ -750,7 +750,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
     }
 
     return FutureBuilder(
-      future: ContactService.getContactInfo(),
+      future: _contactInfoFuture,
       builder: (context, snapshot) {
         final contactInfo = snapshot.data ?? ContactInfo.getDefault();
         final whatsappNum = _resolveCourseWhatsAppNumber(selectedCourse, contactInfo);
@@ -772,17 +772,19 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                       supportLabel: supportLabel,
                     );
                   },
-            icon: const Icon(Icons.headset_mic, size: 20),
+            icon: Icon(Icons.headset_mic, size: 20.r),
             label: Text(
               isLoading ? 'Contacting...' : supportLabel,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              style: AppTextStyles.button.copyWith(fontSize: 16.sp, fontWeight: FontWeight.w700),
             ),
             style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              side: const BorderSide(color: Color(0xFF582DB0), width: 2),
-              foregroundColor: const Color(0xFF582DB0),
+              padding: EdgeInsets.symmetric(vertical: 18.h),
+              side: BorderSide(color: AppColors.primary, width: 2.r),
+              foregroundColor: AppColors.primary,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.r),
               ),
             ),
           ),
@@ -804,94 +806,93 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
       builder: (sheetContext) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
             child: Container(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(24.r),
                 border: Border.all(
-                  color: const Color(0xFF582DB0),
-                  width: 2,
+                  color: AppColors.primary,
+                  width: 2.r,
                 ),
-                gradient: const LinearGradient(
+                gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Color(0xFFF5F0FF),
-                    Color(0xFFFFFFFF),
+                    AppColors.surface,
+                    AppColors.background,
                   ],
                 ),
-                boxShadow: const [
+                boxShadow: [
                   BoxShadow(
-                    color: Color(0x33582DB0),
-                    blurRadius: 24,
-                    offset: Offset(0, 12),
+                    color: AppColors.primary.withOpacity(0.2),
+                    blurRadius: 24.r,
+                    offset: Offset(0, 12.h),
                   ),
                 ],
               ),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 24.h),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Center(
                       child: Container(
-                        width: 48,
-                        height: 5,
+                        width: 48.w,
+                        height: 5.h,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFBFA5ED),
-                          borderRadius: BorderRadius.circular(3),
+                          color: AppColors.primary.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(3.r),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: 20.h),
                     Row(
                       children: [
                         Container(
-                          width: 52,
-                          height: 52,
+                          width: 52.r,
+                          height: 52.r,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: const LinearGradient(
                               colors: [
-                                Color(0xFF4D23AA),
-                                Color(0xFF6435C8),
+                                AppColors.primary,
+                                AppColors.primaryLight,
                               ],
                             ),
-                            boxShadow: const [
+                            boxShadow: [
                               BoxShadow(
-                                color: Color(0x40582DB0),
-                                blurRadius: 20,
-                                offset: Offset(0, 8),
+                                color: AppColors.primary.withOpacity(0.3),
+                                blurRadius: 20.r,
+                                offset: Offset(0, 8.h),
                               ),
                             ],
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.headset_mic,
                             color: Colors.white,
-                            size: 26,
+                            size: 26.r,
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        SizedBox(width: 16.w),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 supportLabel,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF582DB0),
+                                style: AppTextStyles.headline2.copyWith(
+                                  fontSize: 20.sp,
+                                  color: AppColors.primary,
                                 ),
                               ),
-                              const SizedBox(height: 6),
+                              SizedBox(height: 6.h),
                               Text(
                                 'Reach us on WhatsApp at $displayNumber',
-                                style: const TextStyle(
-                                  fontSize: 14,
+                                style: AppTextStyles.body2.copyWith(
+                                  fontSize: 14.sp,
                                   height: 1.5,
-                                  color: Color(0xFF4C3B82),
+                                  color: AppColors.textPrimary,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -899,31 +900,31 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close_rounded, color: Color(0xFF582DB0)),
+                          icon: Icon(Icons.close_rounded, color: AppColors.primary, size: 24.r),
                           tooltip: 'Close',
                           onPressed: () => Navigator.of(sheetContext).pop(),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 28),
+                    SizedBox(height: 28.h),
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF25D366),
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.whatsapp,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: EdgeInsets.symmetric(vertical: 16.h),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(16.r),
                           ),
                           elevation: 4,
                         ),
-                        icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 20),
-                        label: const Text(
+                        icon: FaIcon(FontAwesomeIcons.whatsapp, size: 20.r),
+                        label: Text(
                           'WhatsApp',
-                          style: TextStyle(
+                          style: AppTextStyles.button.copyWith(
                             fontWeight: FontWeight.w800,
-                            fontSize: 16,
+                            fontSize: 16.sp,
                           ),
                         ),
                         onPressed: () async {
@@ -934,15 +935,15 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                         },
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24.h),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(14),
+                      padding: EdgeInsets.all(14.r),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(16.r),
                         border: Border.all(
-                          color: const Color(0xFFE0D2FF),
+                          color: AppColors.primary.withOpacity(0.1),
                           width: 1,
                         ),
                       ),
@@ -950,35 +951,35 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: EdgeInsets.all(8.r),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEEE4FF),
-                              borderRadius: BorderRadius.circular(12),
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12.r),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.info_outline,
-                              color: Color(0xFF582DB0),
-                              size: 20,
+                              color: AppColors.primary,
+                              size: 20.r,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: 12.w),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   supportLabel,
-                                  style: const TextStyle(
+                                  style: AppTextStyles.body1.copyWith(
                                     fontWeight: FontWeight.w700,
-                                    color: Color(0xFF452D8A),
+                                    color: AppColors.primary,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                const Text(
+                                SizedBox(height: 4.h),
+                                Text(
                                   'Available Mon - Sat · 9:00 AM to 6:00 PM',
-                                  style: TextStyle(
-                                    color: Color(0xFF5B4A9B),
-                                    fontSize: 13,
+                                  style: AppTextStyles.caption.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 13.sp,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -1002,50 +1003,55 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.all(20.r),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(20.r),
             border: Border.all(
-              color: const Color(0xFF582DB0),
-              width: 2,
+              color: AppColors.primary,
+              width: 2.r,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.2),
+                blurRadius: 24.r,
+                offset: Offset(0, 12.h),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
+                padding: EdgeInsets.all(20.r),
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                    colors: [AppColors.primary, AppColors.primaryLight],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(18),
-                    topRight: Radius.circular(18),
+                    topLeft: Radius.circular(18.r),
+                    topRight: Radius.circular(18.r),
                   ),
                 ),
                 child: Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Select Course',
-                        style: TextStyle(
+                        style: AppTextStyles.headline1.copyWith(
                           color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 20,
+                          fontSize: 20.sp,
                           fontStyle: FontStyle.italic,
                         ),
                       ),
                     ),
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close, color: Colors.white),
+                      icon: Icon(Icons.close, color: Colors.white, size: 24.r),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                     ),
@@ -1054,8 +1060,8 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
               ),
               Flexible(
                 child: Container(
-                  constraints: const BoxConstraints(maxHeight: 400),
-                  padding: const EdgeInsets.all(16),
+                  constraints: BoxConstraints(maxHeight: 400.h),
+                  padding: EdgeInsets.all(16.r),
                   child: Builder(
                     builder: (context) {
                       final filteredCourses = courses.where((course) {
@@ -1064,14 +1070,14 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                       }).toList();
 
                       if (filteredCourses.isEmpty) {
-                        return const Center(
+                        return Center(
                           child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 40),
+                            padding: EdgeInsets.symmetric(vertical: 40.h),
                             child: Text(
                               'No courses with assigned streams found.',
-                              style: TextStyle(
-                                color: Color(0xFF64748B),
-                                fontSize: 14,
+                              style: AppTextStyles.body2.copyWith(
+                                color: AppColors.textSecondary,
+                                fontSize: 14.sp,
                                 fontWeight: FontWeight.w500,
                               ),
                               textAlign: TextAlign.center,
@@ -1090,23 +1096,23 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
 
                       return Card(
                         elevation: 8,
-                        shadowColor: Colors.black.withOpacity(0.15),
+                        shadowColor: AppColors.shadow,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(16.r),
                           side: BorderSide(
-                            color: isSelected ? const Color(0xFF582DB0) : const Color(0xFFE2E8F0),
-                            width: isSelected ? 2 : 1,
+                            color: isSelected ? AppColors.primary : AppColors.divider,
+                            width: isSelected ? 2.r : 1.r,
                           ),
                         ),
-                        margin: const EdgeInsets.only(bottom: 12),
+                        margin: EdgeInsets.only(bottom: 12.h),
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(16.r),
                           onTap: () {
                             _setSelectedCourse(course, resetVisibility: true);
                             Navigator.of(context).pop();
                           },
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                            padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 16.h),
                             child: _StreamChip(
                               title: displayStreamTitle,
                               isSelectedChip: isSelected,
@@ -1140,12 +1146,16 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   }
 
   List<CourseChapter> _resolveAssignedChapters(JoinedCourse course) {
-    // Only return chapters if they have been explicitly loaded via "Load Chapters" button
+    // Show chapters if they are already present in the course object (e.g. from cache)
+    if (course.chapters.isNotEmpty) {
+      return course.chapters;
+    }
+    
+    // Fallback: only track explicitly loaded if we actually made a network call
     final courseKey = '${course.courseId}_${course.streamId}';
     if (_loadedChapters.contains(courseKey) && course.chapters.isNotEmpty) {
       return course.chapters;
     }
-    // Don't show chapters even if they exist in cache - user must click "Load Chapters"
     return const [];
   }
 
@@ -1214,102 +1224,101 @@ class _Banner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20.r),
         border: Border.all(
-          color: const Color(0xFFCBD5E1),
-          width: 2,
+          color: AppColors.divider,
+          width: 2.r,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            spreadRadius: 2,
-            offset: const Offset(0, 8),
+            color: AppColors.shadow,
+            blurRadius: 20.r,
+            spreadRadius: 2.r,
+            offset: Offset(0, 8.h),
           ),
         ],
       ),
       child: Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(24.r),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 selected.thumbnailUrl != null && selected.thumbnailUrl!.isNotEmpty
                     ? ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(8.r),
                         child: CachedNetworkImage(
                           imageUrl: CourseService.getFullImageUrl(selected.thumbnailUrl!),
-                          width: 64,
-                          height: 64,
+                          width: 64.w,
+                          height: 64.h,
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Container(
-                            width: 64,
-                            height: 64,
-                            color: Colors.grey[200],
+                            width: 64.w,
+                            height: 64.h,
+                            color: AppColors.divider.withOpacity(0.1),
                             child: const Center(
                               child: SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF582DB0)),
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                                 ),
                               ),
                             ),
                           ),
                           errorWidget: (context, url, error) => Icon(
                             CourseUtils.getCourseIcon(selected.title),
-                            color: const Color(0xFF000000),
-                            size: 48,
+                            color: AppColors.textPrimary,
+                            size: 48.r,
                           ),
-                          memCacheWidth: 128, // Cache smaller image for better performance
+                          memCacheWidth: 128,
                           memCacheHeight: 128,
                         ),
                       )
                     : Icon(
                         CourseUtils.getCourseIcon(selected.title),
-                        color: const Color(0xFF000000),
-                        size: 48,
+                        color: AppColors.textPrimary,
+                        size: 48.r,
                       ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16.h),
                 Text(
                   selected.title,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(0xFF000000),
-                    fontWeight: FontWeight.w900,
-                    fontSize: 24,
+                  style: AppTextStyles.headline1.copyWith(
+                    color: AppColors.textPrimary,
+                    fontSize: 24.sp,
                     fontStyle: FontStyle.italic,
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12.h),
                 RatingStars(rating: selected.rating),
-                const SizedBox(height: 12),
+                SizedBox(height: 12.h),
                 if (selected.streamName != null && selected.streamName!.trim().isNotEmpty)
                   _SelectedStreamBadge(streamName: selected.streamName!.trim()),
               ],
             ),
           ),
           Positioned(
-            top: 12,
-            right: 12,
+            top: 12.h,
+            right: 12.w,
             child: IconButton(
               onPressed: onChangeCourse,
-              icon: const Icon(
+              icon: Icon(
                 Icons.swap_horiz,
-                color: Color(0xFF582DB0),
-                size: 24,
+                color: AppColors.primary,
+                size: 24.r,
               ),
               style: IconButton.styleFrom(
-                backgroundColor: Colors.white,
+                backgroundColor: AppColors.surface,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: const BorderSide(color: Color(0xFF582DB0), width: 1.5),
+                  borderRadius: BorderRadius.circular(8.r),
+                  side: BorderSide(color: AppColors.primary, width: 1.5.r),
                 ),
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(8.r),
               ),
             ),
           ),
@@ -1335,26 +1344,26 @@ class _StreamChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
         decoration: BoxDecoration(
           gradient: isSelectedChip
-              ? const LinearGradient(
-                  colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+              ? LinearGradient(
+                  colors: [AppColors.primary, AppColors.primaryLight],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 )
               : null,
-          color: isSelectedChip ? null : const Color(0xFFF8F5FF),
-          borderRadius: BorderRadius.circular(28),
+          color: isSelectedChip ? null : AppColors.primary.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(28.r),
           border: Border.all(
-            color: isSelectedChip ? const Color(0xFF582DB0) : const Color(0xFF582DB0).withOpacity(0.3),
-            width: isSelectedChip ? 1.6 : 1.2,
+            color: isSelectedChip ? AppColors.primary : AppColors.primary.withOpacity(0.3),
+            width: isSelectedChip ? 1.6.r : 1.2.r,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isSelectedChip ? 0.15 : 0.05),
-              blurRadius: isSelectedChip ? 10 : 6,
-              offset: const Offset(0, 4),
+              color: AppColors.primary.withOpacity(isSelectedChip ? 0.15 : 0.05),
+              blurRadius: isSelectedChip ? 10.r : 6.r,
+              offset: Offset(0, 4.h),
             ),
           ],
         ),
@@ -1362,18 +1371,18 @@ class _StreamChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (isSelectedChip)
-              const Icon(
+              Icon(
                 Icons.check_circle,
-                size: 18,
+                size: 18.r,
                 color: Colors.white,
               ),
-            if (isSelectedChip) const SizedBox(width: 8),
+            if (isSelectedChip) SizedBox(width: 8.w),
             Text(
               title.trim(),
-              style: TextStyle(
-                color: isSelectedChip ? Colors.white : const Color(0xFF582DB0),
+              style: AppTextStyles.body1.copyWith(
+                color: isSelectedChip ? Colors.white : AppColors.primary,
                 fontWeight: FontWeight.w700,
-                fontSize: 15,
+                fontSize: 15.sp,
               ),
             ),
           ],
@@ -1391,32 +1400,32 @@ class _SelectedStreamBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 10.h),
       decoration: BoxDecoration(
-        color: const Color(0xFFEDE9FE),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF582DB0), width: 1.4),
+        color: AppColors.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(24.r),
+        border: Border.all(color: AppColors.primary, width: 1.4.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: AppColors.primary.withOpacity(0.08),
+            blurRadius: 10.r,
+            offset: Offset(0, 4.h),
           ),
         ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.local_library_outlined,
-            color: Color(0xFF582DB0),
-            size: 18,
+            color: AppColors.primary,
+            size: 18.r,
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8.w),
           Text(
             streamName.toUpperCase(),
-            style: const TextStyle(
-              color: Color(0xFF582DB0),
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.primary,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.6,
             ),

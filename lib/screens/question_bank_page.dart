@@ -1,3 +1,7 @@
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../data/joined_courses.dart';
@@ -46,20 +50,20 @@ class QuestionBankPage extends StatelessWidget {
     final mcqs = _collectMcqs();
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: CupertinoNavigationBarBackButton(
           onPressed: () => Navigator.of(context).pop(),
-          color: Colors.black,
+          color: AppColors.textPrimary,
         ),
-        title: const Text(
+        title: Text(
           'MCQ',
-          style: TextStyle(
-            color: Color(0xFF582DB0),
-            fontWeight: FontWeight.w900,
-            fontSize: 20,
+          style: AppTextStyles.headline1.copyWith(
+            color: AppColors.primary,
+            fontSize: 20.sp,
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -68,26 +72,37 @@ class QuestionBankPage extends StatelessWidget {
         delay: 100,
         child: mcqs.isEmpty
             ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                  Icon(Icons.quiz_outlined, size: 64, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No MCQs available for this chapter',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                child: Padding(
+                  padding: EdgeInsets.all(32.r),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(24.r),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.quiz_outlined, size: 64.r, color: AppColors.primary),
+                      ),
+                      SizedBox(height: 24.h),
+                      Text(
+                        'No MCQs available for this chapter',
+                        style: AppTextStyles.body1.copyWith(color: AppColors.textSecondary),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 12.h),
+                      Text(
+                        'MCQs will appear here when they are added to videos',
+                        style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary.withOpacity(0.7), fontSize: 14.sp),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'MCQs will appear here when they are added to videos',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            )
+                ),
+              )
             : ListView.separated(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(16.r),
                 itemBuilder: (context, index) {
                   final mcq = mcqs[index];
                   final fullUrl = MaterialService.getFullMaterialUrl(mcq.url);
@@ -95,80 +110,84 @@ class QuestionBankPage extends StatelessWidget {
                   return AnimatedListItem(
                     index: index,
                     child: Card(
-                  elevation: 2,
-                  shadowColor: Colors.black.withOpacity(0.1),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: Colors.grey[300]!, width: 1),
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    leading: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4ECDC4).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
+                      elevation: 2,
+                      shadowColor: AppColors.shadow,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16.r),
+                        side: BorderSide(color: AppColors.divider, width: 1.r),
                       ),
-                      child: const Icon(Icons.quiz, color: Color(0xFF4ECDC4), size: 24),
-                    ),
-                    title: Text(
-                      mcq.videoName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1E293B),
-                        fontSize: 16,
-                      ),
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Row(
-                        children: [
-                          Icon(Icons.play_circle_outline, size: 14, color: Colors.grey[600]),
-                          const SizedBox(width: 4),
-                          Text(
-                            mcq.lessonName,
-                            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                        leading: Container(
+                          padding: EdgeInsets.all(12.r),
+                          decoration: BoxDecoration(
+                            color: AppColors.accent.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12.r),
                           ),
-                        ],
+                          child: Icon(Icons.quiz, color: AppColors.accent, size: 24.r),
+                        ),
+                        title: Text(
+                          mcq.videoName,
+                          style: AppTextStyles.body1.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            fontSize: 16.sp,
+                          ),
+                        ),
+                        subtitle: Padding(
+                          padding: EdgeInsets.only(top: 4.h),
+                          child: Row(
+                            children: [
+                              Icon(Icons.play_circle_outline, size: 14.r, color: AppColors.textSecondary),
+                              SizedBox(width: 4.w),
+                              Expanded(
+                                child: Text(
+                                  mcq.lessonName,
+                                  style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary, fontSize: 13.sp),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        trailing: Container(
+                          padding: EdgeInsets.all(10.r),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          child: Icon(Icons.visibility_outlined, color: AppColors.primary, size: 20.r),
+                        ),
+                        onTap: () {
+                          if (fullUrl.isNotEmpty) {
+                            debugPrint('📝 Opening MCQ: ${mcq.title}');
+                            debugPrint('   URL: $fullUrl');
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => PdfViewerScreen(
+                                  pdfUrl: fullUrl,
+                                  pdfTitle: mcq.title,
+                                  allowDownload: false,
+                                ),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('MCQ URL is not available'),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                          }
+                        },
                       ),
                     ),
-                    trailing: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF582DB0).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.visibility_outlined, color: Color(0xFF582DB0), size: 20),
-                    ),
-                    onTap: () {
-                      if (fullUrl.isNotEmpty) {
-                        debugPrint('📝 Opening MCQ: ${mcq.title}');
-                        debugPrint('   URL: $fullUrl');
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => PdfViewerScreen(
-                              pdfUrl: fullUrl,
-                              pdfTitle: mcq.title,
-                              allowDownload: false,
-                            ),
-                          ),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('MCQ URL is not available'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                ),
-                );
-              },
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemCount: mcqs.length,
-            ),
+                  );
+                },
+                separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                itemCount: mcqs.length,
+              ),
       ),
     );
   }

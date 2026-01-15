@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
 import '../utils/json_parser.dart';
+import 'home_service.dart';
 
 class ContactInfo {
   const ContactInfo({
@@ -198,75 +199,67 @@ class ContactService {
       }
       
       // Try home API to get contact info from data.contacts or data.whatsapp
-      debugPrint('🔄 Fetching contact information from home API...');
+      debugPrint('🔄 Fetching contact information from HomeService...');
       try {
-        final homeResponse = await ApiClient.get('/api/home/', queryParams: {'format': 'json'}, includeAuth: false);
+        final homeData = await HomeService.fetchHomeData(forceRefresh: forceRefresh);
+        final dataMap = homeData.containsKey('data') && homeData['data'] is Map
+            ? homeData['data'] as Map<String, dynamic>
+            : <String, dynamic>{};
         
-        if (homeResponse.statusCode == 200) {
-          final Map<String, dynamic> homeData = json.decode(homeResponse.body);
-          
-          if (homeData.containsKey('data') && homeData['data'] is Map) {
-            final dataMap = homeData['data'] as Map<String, dynamic>;
-            
-            // Check for contacts array in home API
-            if (dataMap.containsKey('contacts') && dataMap['contacts'] is List) {
-              final contacts = dataMap['contacts'] as List<dynamic>;
-              if (contacts.isNotEmpty) {
-                debugPrint('✅ Found contacts in home API');
-                final contactData = contacts[0] as Map<String, dynamic>;
-                final contactInfo = ContactInfo.fromJson(contactData);
-                
-                // Cache and return
-                _cachedContactInfo = contactInfo;
-                _cacheTime = DateTime.now();
-                await _saveToCache(contactInfo);
-                debugPrint('✅ Contact info loaded from home API: email=${contactInfo.email}, phone=${contactInfo.phone}');
-                return contactInfo;
-              }
+        if (dataMap.isNotEmpty) {
+          // Check for contacts array in HomeService data
+          if (dataMap.containsKey('contacts') && dataMap['contacts'] is List) {
+            final contacts = dataMap['contacts'] as List<dynamic>;
+            if (contacts.isNotEmpty) {
+              debugPrint('✅ Found contacts in HomeService response');
+              final contactData = contacts[0] as Map<String, dynamic>;
+              final contactInfo = ContactInfo.fromJson(contactData);
+              
+              // Cache and return
+              _cachedContactInfo = contactInfo;
+              _cacheTime = DateTime.now();
+              await _saveToCache(contactInfo);
+              debugPrint('✅ Contact info loaded from HomeService (contacts): email=${contactInfo.email}, phone=${contactInfo.phone}');
+              return contactInfo;
             }
-            
-            // Check for whatsapp array in home API (fallback)
-            if (dataMap.containsKey('whatsapp') && dataMap['whatsapp'] is List) {
-              final whatsappList = dataMap['whatsapp'] as List<dynamic>;
-              if (whatsappList.isNotEmpty) {
-                debugPrint('✅ Found whatsapp data in home API');
-                final whatsappData = whatsappList[0] as Map<String, dynamic>;
-                final whatsappNumber = whatsappData['number']?.toString();
-                
-                // Extract phone number from whatsapp number if available
-                String? phoneNumber;
-                String? whatsappNum;
-                if (whatsappNumber != null) {
-                  // Keep +91 prefix, remove spaces, keep digits and +
-                  final cleaned = whatsappNumber
-                      .replaceAll(RegExp(r'\s'), '')
-                      .replaceAll(RegExp(r'[^0-9+]'), '');
-                  // Ensure it starts with 91 (for WhatsApp URL, no + needed)
-                  whatsappNum = cleaned.startsWith('+91') ? cleaned.substring(3) : (cleaned.startsWith('91') ? cleaned : '91$cleaned');
-                  phoneNumber = ContactInfo._removeCountryCode(whatsappNumber); // Keep formatted version for display
-                }
-                
-                // Create ContactInfo from whatsapp data
-                final contactInfo = ContactInfo(
-                  phone: phoneNumber,
-                  whatsappNumber: whatsappNum,
-                  whatsappGroupLink: ContactInfo.getDefault().whatsappGroupLink,
-                  email: ContactInfo.getDefault().email,
-                  website: ContactInfo.getDefault().website,
-                );
-                
-                // Cache and return
-                _cachedContactInfo = contactInfo;
-                _cacheTime = DateTime.now();
-                await _saveToCache(contactInfo);
-                debugPrint('✅ Contact info loaded from home API whatsapp: phone=${contactInfo.phone}, whatsapp=${contactInfo.whatsappNumber}');
-                return contactInfo;
+          }
+          
+          // Check for whatsapp array in HomeService data (fallback)
+          if (dataMap.containsKey('whatsapp') && dataMap['whatsapp'] is List) {
+            final whatsappList = dataMap['whatsapp'] as List<dynamic>;
+            if (whatsappList.isNotEmpty) {
+              debugPrint('✅ Found whatsapp data in HomeService response');
+              final whatsappData = whatsappList[0] as Map<String, dynamic>;
+              final whatsappNumber = whatsappData['number']?.toString();
+              
+              String? phoneNumber;
+              String? whatsappNum;
+              if (whatsappNumber != null) {
+                final cleaned = whatsappNumber
+                    .replaceAll(RegExp(r'\s'), '')
+                    .replaceAll(RegExp(r'[^0-9+]'), '');
+                whatsappNum = cleaned.startsWith('+91') ? cleaned.substring(3) : (cleaned.startsWith('91') ? cleaned : '91$cleaned');
+                phoneNumber = ContactInfo._removeCountryCode(whatsappNumber);
               }
+              
+              final contactInfo = ContactInfo(
+                phone: phoneNumber,
+                whatsappNumber: whatsappNum,
+                whatsappGroupLink: ContactInfo.getDefault().whatsappGroupLink,
+                email: ContactInfo.getDefault().email,
+                website: ContactInfo.getDefault().website,
+              );
+              
+              _cachedContactInfo = contactInfo;
+              _cacheTime = DateTime.now();
+              await _saveToCache(contactInfo);
+              debugPrint('✅ Contact info loaded from HomeService (whatsapp): phone=${contactInfo.phone}, whatsapp=${contactInfo.whatsappNumber}');
+              return contactInfo;
             }
           }
         }
       } catch (e) {
-        debugPrint('⚠️ Home API failed, trying contact endpoint: $e');
+        debugPrint('⚠️ HomeService fetch for contact failed: $e');
       }
       
       // Fallback to contact API endpoint

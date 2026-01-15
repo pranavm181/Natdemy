@@ -1,8 +1,13 @@
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:vimeo_video_player/vimeo_video_player.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../data/lesson_videos_config.dart';
 import '../data/joined_courses.dart';
 import '../api/material_service.dart';
@@ -120,20 +125,21 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   Widget build(BuildContext context) {
     if (!useApiVideos || apiVideos.isEmpty) {
       return Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.background,
+          surfaceTintColor: Colors.transparent,
           elevation: 0,
           leading: CupertinoNavigationBarBackButton(
             onPressed: () => Navigator.of(context).pop(),
-            color: const Color(0xFF582DB0),
+            color: AppColors.textPrimary,
           ),
           automaticallyImplyLeading: true,
           title: Text(
             widget.lessonName.toUpperCase(),
-            style: const TextStyle(
-              color: Color(0xFF582DB0),
-              fontWeight: FontWeight.w900,
-              fontSize: 20,
+            style: AppTextStyles.headline1.copyWith(
+              color: AppColors.primary,
+              fontSize: 20.sp,
               fontStyle: FontStyle.italic,
             ),
           ),
@@ -210,21 +216,21 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     }
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: CupertinoNavigationBarBackButton(
           onPressed: () => Navigator.of(context).pop(),
-          color: const Color(0xFF582DB0),
+          color: AppColors.textPrimary,
         ),
         automaticallyImplyLeading: true,
         title: Text(
           widget.lessonName.toUpperCase(),
-          style: const TextStyle(
-            color: Color(0xFF582DB0),
-            fontWeight: FontWeight.w900,
-            fontSize: 20,
+          style: AppTextStyles.headline1.copyWith(
+            color: AppColors.primary,
+            fontSize: 20.sp,
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -232,15 +238,15 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       body: ListView(
         children: [
           Card(
-            margin: const EdgeInsets.all(16),
+            margin: EdgeInsets.all(16.r),
             elevation: 8,
-            shadowColor: Colors.black.withOpacity(0.15),
+            shadowColor: AppColors.shadow,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: const BorderSide(color: Color(0xFF582DB0), width: 2),
+              borderRadius: BorderRadius.circular(20.r),
+              side: BorderSide(color: AppColors.primary, width: 2.r),
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(20.r),
               child: Column(
                 children: [
                   if (videoId.isNotEmpty)
@@ -900,9 +906,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                       ),
                     ),
                   Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF1E293B),
+                    padding: EdgeInsets.all(16.r),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
                     ),
                     child: Row(
                       children: [
@@ -911,9 +917,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                             useApiVideos
                                 ? (currentCourseVideo?.name ?? 'Lesson Video')
                                 : 'Lesson Video',
-                            style: const TextStyle(
+                            style: AppTextStyles.body1.copyWith(
                               color: Colors.white,
-                              fontSize: 16,
+                              fontSize: 16.sp,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -928,7 +934,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
           // View Lesson Materials Button
           if (hasMaterials) ...[
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
               child: FilledButton.icon(
                 onPressed: () {
                   // Scroll to materials section or show materials dialog
@@ -937,11 +943,13 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
-                        title: const Text(
+                        backgroundColor: AppColors.background,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+                        title: Text(
                           'Lesson Materials',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF582DB0),
+                          style: AppTextStyles.headline1.copyWith(
+                            color: AppColors.primary,
+                            fontSize: 22.sp,
                           ),
                         ),
                         content: SizedBox(
@@ -953,14 +961,34 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                               final material = lessonMaterials[index];
                               final fullUrl = MaterialService.getFullMaterialUrl(material.url);
                               return Card(
-                                margin: const EdgeInsets.only(bottom: 8),
+                                margin: EdgeInsets.only(bottom: 8.h),
+                                elevation: 4,
+                                shadowColor: AppColors.shadow,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                                 child: ListTile(
-                                  leading: const Icon(Icons.picture_as_pdf, color: Color(0xFFEF4444)),
-                                  title: Text(material.name),
+                                  leading: Container(
+                                    padding: EdgeInsets.all(8.r),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.error.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                    child: Icon(Icons.picture_as_pdf, color: AppColors.error, size: 20.r),
+                                  ),
+                                  title: Text(
+                                    material.name,
+                                    style: AppTextStyles.body1.copyWith(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14.sp,
+                                    ),
+                                  ),
                                   subtitle: material.sizeLabel != null
-                                      ? Text(material.sizeLabel!)
+                                      ? Text(
+                                          material.sizeLabel!,
+                                          style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                                        )
                                       : null,
-                                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                                  trailing: Icon(Icons.arrow_forward_ios, size: 14.r, color: AppColors.primary),
                                   onTap: () {
                                     Navigator.of(context).pop();
                                     Navigator.of(context).push(
@@ -980,36 +1008,39 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('Close'),
+                            child: Text(
+                              'CLOSE',
+                              style: AppTextStyles.button.copyWith(color: AppColors.primary),
+                            ),
                           ),
                         ],
                       ),
                     );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('No material available'),
-                        backgroundColor: Colors.red,
+                      SnackBar(
+                        content: const Text('No material available'),
+                        backgroundColor: AppColors.error,
                       ),
                     );
                   }
                 },
-                icon: const Icon(Icons.picture_as_pdf, size: 22),
+                icon: Icon(Icons.picture_as_pdf, size: 22.r),
                 label: Text(
                   lessonMaterials.isNotEmpty
                       ? 'View Lesson Materials (${lessonMaterials.length})'
                       : 'View Lesson Material',
-                  style: const TextStyle(
-                    fontSize: 16,
+                  style: AppTextStyles.button.copyWith(
+                    fontSize: 16.sp,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF582DB0),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                  padding: EdgeInsets.symmetric(vertical: 16.h, horizontal: 20.w),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(12.r),
                   ),
                 ),
               ),
@@ -1018,17 +1049,16 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
           // Lesson Materials Section
           if (hasMaterials) ...[
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
               child: Row(
                 children: [
-                  const Icon(Icons.picture_as_pdf, color: Color(0xFFEF4444), size: 24),
-                  const SizedBox(width: 8),
-                  const Text(
+                  Icon(Icons.picture_as_pdf, color: AppColors.error, size: 24.r),
+                  SizedBox(width: 8.w),
+                  Text(
                     'MATERIALS',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF1E293B),
-                      fontSize: 18,
+                    style: AppTextStyles.headline2.copyWith(
+                      color: AppColors.textPrimary,
+                      fontSize: 18.sp,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -1038,18 +1068,18 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
             if (lessonMaterials.isNotEmpty)
               // Show all materials from API
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (lessonMaterials.length > 1)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
+                        padding: EdgeInsets.only(bottom: 8.h),
                         child: Text(
                           '${lessonMaterials.length} materials available',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 13,
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 13.sp,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -1057,52 +1087,53 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                     ...lessonMaterials.map((material) {
                     final fullUrl = MaterialService.getFullMaterialUrl(material.url);
                     return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
+                      margin: EdgeInsets.only(bottom: 12.h),
                       elevation: 2,
+                      shadowColor: AppColors.shadow,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.grey[300]!, width: 1),
+                        borderRadius: BorderRadius.circular(12.r),
+                        side: BorderSide(color: AppColors.divider, width: 1.r),
                       ),
                       child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                         leading: Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: EdgeInsets.all(10.r),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10),
+                            color: AppColors.error.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10.r),
                           ),
-                          child: const Icon(Icons.picture_as_pdf, color: Color(0xFFEF4444), size: 24),
+                          child: Icon(Icons.picture_as_pdf, color: AppColors.error, size: 24.r),
                         ),
                         title: Text(
                           material.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1E293B),
-                            fontSize: 15,
+                          style: AppTextStyles.body2.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            fontSize: 15.sp,
                           ),
                         ),
                         subtitle: material.sizeLabel != null
                             ? Padding(
-                                padding: const EdgeInsets.only(top: 4),
+                                padding: EdgeInsets.only(top: 4.h),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.file_present, size: 14, color: Colors.grey[600]),
-                                    const SizedBox(width: 4),
+                                    Icon(Icons.file_present, size: 14.r, color: AppColors.textSecondary),
+                                    SizedBox(width: 4.w),
                                     Text(
                                       material.sizeLabel!,
-                                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                      style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary, fontSize: 12.sp),
                                     ),
                                   ],
                                 ),
                               )
                             : null,
                         trailing: Container(
-                          padding: const EdgeInsets.all(8),
+                          padding: EdgeInsets.all(8.r),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF582DB0).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8.r),
                           ),
-                          child: const Icon(Icons.visibility_outlined, color: Color(0xFF582DB0), size: 20),
+                          child: Icon(Icons.visibility_outlined, color: AppColors.primary, size: 20.r),
                         ),
                         onTap: () {
                           Navigator.of(context).push(
@@ -1120,74 +1151,75 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                   ],
                 ),
               ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8.h),
           ],
-          const SizedBox(height: 20),
+          SizedBox(height: 20.h),
           Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
+              margin: EdgeInsets.symmetric(horizontal: 16.w),
               elevation: 8,
-              shadowColor: Colors.black.withOpacity(0.15),
+              shadowColor: AppColors.shadow,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: const BorderSide(color: Color(0xFF582DB0), width: 2),
+                borderRadius: BorderRadius.circular(20.r),
+                side: BorderSide(color: AppColors.primary, width: 2.r),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(20.r),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'VIDEOS IN THIS LESSON',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            color: const Color(0xFF000000),
-                            fontSize: 22,
-                            letterSpacing: 0.5,
-                          ),
+                      style: AppTextStyles.headline2.copyWith(
+                        color: AppColors.textPrimary,
+                        fontSize: 22.sp,
+                        letterSpacing: 0.5,
+                      ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16.h),
                     ..._currentVideoList().asMap().entries.map((entry) {
                       final index = entry.key;
                       final videoTitle = entry.value;
                       final isSelected = index == selectedVideoIndex;
                       return Card(
-                        elevation: 8,
-                        shadowColor: Colors.black.withOpacity(0.15),
-                        margin: const EdgeInsets.only(bottom: 12),
+                        elevation: isSelected ? 8 : 2,
+                        shadowColor: isSelected ? AppColors.primary.withOpacity(0.3) : AppColors.shadow,
+                        margin: EdgeInsets.only(bottom: 12.h),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(16.r),
                           side: BorderSide(
-                            color: isSelected ? const Color(0xFF582DB0) : const Color(0xFF582DB0),
-                            width: isSelected ? 3 : 2,
+                            color: isSelected ? AppColors.primary : AppColors.divider,
+                            width: isSelected ? 3.r : 1.r,
                           ),
                         ),
                         child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                           leading: Container(
-                            padding: const EdgeInsets.all(10),
+                            padding: EdgeInsets.all(10.r),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? const Color(0xFF582DB0).withOpacity(0.15)
-                                  : const Color(0xFF582DB0).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
+                                  ? AppColors.primary.withOpacity(0.15)
+                                  : AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10.r),
                             ),
                             child: Icon(
                               isSelected ? Icons.play_circle_filled : Icons.play_circle_outline,
-                              color: const Color(0xFF582DB0),
-                              size: 28,
+                              color: AppColors.primary,
+                              size: 28.r,
                             ),
                           ),
                           title: Text(
                             videoTitle,
-                            style: TextStyle(
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                              color: const Color(0xFF1E293B),
-                              fontSize: 16,
+                            style: AppTextStyles.body1.copyWith(
+                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                              color: AppColors.textPrimary,
+                              fontSize: 16.sp,
                             ),
                           ),
-                          trailing: isSelected
-                              ? const Icon(Icons.check_circle, color: Color(0xFF582DB0), size: 28)
-                              : const Icon(Icons.chevron_right, color: Color(0xFF582DB0), size: 28),
+                          trailing: Icon(
+                            isSelected ? Icons.check_circle : Icons.chevron_right,
+                            color: AppColors.primary,
+                            size: 28.r,
+                          ),
                           onTap: () => _selectVideo(index),
                         ),
                       );
@@ -1196,22 +1228,21 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                 ),
               ),
             ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24.h),
           // Video Material Section (for currently selected video) - moved to bottom
           if (currentVideoMaterial != null && currentVideoMaterial.isNotEmpty) ...[
-            const SizedBox(height: 20),
+            SizedBox(height: 20.h),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
               child: Row(
                 children: [
-                  const Icon(Icons.picture_as_pdf, color: Color(0xFFEF4444), size: 24),
-                  const SizedBox(width: 8),
-                  const Text(
+                  Icon(Icons.picture_as_pdf, color: AppColors.error, size: 24.r),
+                  SizedBox(width: 8.w),
+                  Text(
                     'VIDEO MATERIAL',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF1E293B),
-                      fontSize: 18,
+                    style: AppTextStyles.headline2.copyWith(
+                      color: AppColors.textPrimary,
+                      fontSize: 18.sp,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -1219,51 +1250,56 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: Card(
                 elevation: 2,
+                shadowColor: AppColors.shadow,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey[300]!, width: 1),
+                  borderRadius: BorderRadius.circular(12.r),
+                  side: BorderSide(color: AppColors.divider, width: 1.r),
                 ),
                 child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                   leading: Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: EdgeInsets.all(10.r),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEF4444).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
+                      color: AppColors.error.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10.r),
                     ),
-                    child: const Icon(Icons.picture_as_pdf, color: Color(0xFFEF4444), size: 24),
+                    child: Icon(Icons.picture_as_pdf, color: AppColors.error, size: 24.r),
                   ),
                   title: Text(
                     currentVideoMaterialName ?? 'Video Material',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E293B),
-                      fontSize: 15,
+                    style: AppTextStyles.body2.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      fontSize: 15.sp,
                     ),
                   ),
                   subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 4),
+                    padding: EdgeInsets.only(top: 4.h),
                     child: Row(
                       children: [
-                        Icon(Icons.video_library, size: 14, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Material for: ${useApiVideos ? (currentCourseVideo?.name ?? 'Current Video') : 'Current Video'}',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                        ),
+                        Icon(Icons.video_library, size: 14.r, color: AppColors.textSecondary),
+                        SizedBox(width: 4.w),
+                        Expanded(
+                                child: Text(
+                                  'Material for: ${useApiVideos ? (currentCourseVideo?.name ?? 'Current Video') : 'Current Video'}',
+                                  style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary, fontSize: 12.sp),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
                       ],
                     ),
                   ),
                   trailing: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: EdgeInsets.all(8.r),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF582DB0).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8.r),
                     ),
-                    child: const Icon(Icons.visibility_outlined, color: Color(0xFF582DB0), size: 20),
+                    child: Icon(Icons.visibility_outlined, color: AppColors.primary, size: 20.r),
                   ),
                   onTap: () {
                     final fullUrl = MaterialService.getFullMaterialUrl(currentVideoMaterial);
@@ -1280,23 +1316,22 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8.h),
           ],
           // MCQs Section - moved to bottom
           if (hasMcqs) ...[
-            const SizedBox(height: 20),
+            SizedBox(height: 20.h),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
               child: Row(
                 children: [
-                  const Icon(Icons.quiz, color: Color(0xFF4ECDC4), size: 24),
-                  const SizedBox(width: 8),
-                  const Text(
+                  Icon(Icons.quiz, color: AppColors.accent, size: 24.r),
+                  SizedBox(width: 8.w),
+                  Text(
                     'MCQ',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF1E293B),
-                      fontSize: 18,
+                    style: AppTextStyles.headline2.copyWith(
+                      color: AppColors.textPrimary,
+                      fontSize: 18.sp,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -1304,18 +1339,18 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (lessonMcqs.length > 1)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: EdgeInsets.only(bottom: 8.h),
                       child: Text(
                         '${lessonMcqs.length} MCQs available',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 13,
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 13.sp,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -1323,50 +1358,55 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                   ...lessonMcqs.map((mcq) {
                     final fullUrl = MaterialService.getFullMaterialUrl(mcq.url);
                     return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
+                      margin: EdgeInsets.only(bottom: 12.h),
                       elevation: 2,
+                      shadowColor: AppColors.shadow,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.grey[300]!, width: 1),
+                        borderRadius: BorderRadius.circular(12.r),
+                        side: BorderSide(color: AppColors.divider, width: 1.r),
                       ),
                       child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                         leading: Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: EdgeInsets.all(10.r),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF4ECDC4).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10),
+                            color: AppColors.accent.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10.r),
                           ),
-                          child: const Icon(Icons.quiz, color: Color(0xFF4ECDC4), size: 24),
+                          child: Icon(Icons.quiz, color: AppColors.accent, size: 24.r),
                         ),
                         title: Text(
                           mcq.videoName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1E293B),
-                            fontSize: 15,
+                          style: AppTextStyles.body2.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            fontSize: 15.sp,
                           ),
                         ),
                         subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 4),
+                          padding: EdgeInsets.only(top: 4.h),
                           child: Row(
                             children: [
-                              Icon(Icons.video_library, size: 14, color: Colors.grey[600]),
-                              const SizedBox(width: 4),
-                              Text(
-                                'MCQ for: ${mcq.videoName}',
-                                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                              Icon(Icons.video_library, size: 14.r, color: AppColors.textSecondary),
+                              SizedBox(width: 4.w),
+                              Expanded(
+                                child: Text(
+                                  'MCQ for: ${mcq.videoName}',
+                                  style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary, fontSize: 12.sp),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
                         ),
                         trailing: Container(
-                          padding: const EdgeInsets.all(8),
+                          padding: EdgeInsets.all(8.r),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF582DB0).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8.r),
                           ),
-                          child: const Icon(Icons.visibility_outlined, color: Color(0xFF582DB0), size: 20),
+                          child: Icon(Icons.visibility_outlined, color: AppColors.primary, size: 20.r),
                         ),
                         onTap: () {
                           if (fullUrl.isNotEmpty) {
@@ -1381,9 +1421,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                             );
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('MCQ URL is not available'),
-                                backgroundColor: Colors.red,
+                              SnackBar(
+                                content: const Text('MCQ URL is not available'),
+                                backgroundColor: AppColors.error,
                               ),
                             );
                           }
@@ -1394,7 +1434,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8.h),
           ],
         ],
       ),

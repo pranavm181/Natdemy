@@ -1,0 +1,745 @@
+# FLUTTER DEVELOPMENT BEST PRACTICES
+
+You are an expert Flutter developer. When writing Flutter code, always follow these best practices:
+
+## CODE STRUCTURE & ARCHITECTURE
+
+- Use clean architecture or MVVM pattern - separate UI, business logic, and data layers
+- Create feature-based folder structure (features/auth, features/home, etc.)
+- Keep widgets small and focused - extract complex widgets into separate files
+- Use repository pattern for data access and API calls
+- Implement dependency injection using Provider, Riverpod, or GetIt
+
+## WIDGET BEST PRACTICES
+
+- Use const constructors wherever possible for better performance
+- Prefer StatelessWidget over StatefulWidget when state is not needed
+- Extract repeated UI patterns into reusable custom widgets
+- Use meaningful widget names that describe their purpose
+- Keep build methods clean - extract complex UI into private methods or separate widgets
+- Never perform heavy operations in build methods
+
+## STATE MANAGEMENT
+
+- Choose appropriate state management: Provider/Riverpod for most cases, Bloc for complex apps
+- Keep business logic out of widgets
+- Use ChangeNotifier, StateNotifier, or Cubit for state management classes
+- Implement proper loading, success, error states for async operations
+- Use freezed package for immutable state classes
+
+## API INTEGRATION
+
+- Use Dio package for HTTP requests with proper error handling
+- Implement interceptors for authentication, logging, and error handling
+- Create dedicated service classes for API calls (e.g., AuthService, UserService)
+- Use json_serializable or freezed for JSON parsing
+- Handle all HTTP status codes and network errors gracefully
+- Implement retry logic and timeout configurations
+- Always show loading states during API calls
+
+## ERROR HANDLING
+
+- Use try-catch blocks for all async operations
+- Create custom exception classes for different error types
+- Show user-friendly error messages, never raw error text
+- Log errors for debugging but don't expose sensitive information
+- Implement global error handling where appropriate
+
+## PERFORMANCE OPTIMIZATION
+
+- Use const constructors to prevent unnecessary rebuilds
+- Implement pagination/lazy loading for large lists
+- Use cached_network_image for network images with caching
+- Avoid unnecessary setState calls - only rebuild what's needed
+- Use ListView.builder instead of ListView for long lists
+- Implement image compression before uploading
+- Profile the app regularly using Flutter DevTools
+
+## CODE QUALITY
+
+- Follow Dart style guide and use flutter_lints
+- Write self-documenting code with clear variable and function names
+- Add comments only when code intent is not obvious
+- Keep functions small and single-purpose
+- Use meaningful commit messages
+- Implement null safety properly - avoid using ! unless absolutely necessary
+- Use extensions for utility functions on existing classes
+
+## ASSET MANAGEMENT
+
+- Organize assets in proper folders (images/, icons/, animations/)
+- Use flutter_svg for vector graphics
+- Implement proper asset caching strategies
+- Use lottie or rive for animations
+- Compress images appropriately before adding to project
+
+## NAVIGATION
+
+- Use named routes or go_router for navigation
+- Pass data between screens using constructor parameters or route arguments
+- Implement proper back button handling
+- Use Hero animations for smooth transitions between screens
+
+## DATA PERSISTENCE
+
+- Use shared_preferences for simple key-value storage
+- Use Hive or Isar for local database (better than sqflite for most cases)
+- Implement proper data migration strategies
+- Cache API responses for offline support
+
+## SECURITY
+
+- Never hardcode API keys or sensitive data in code
+- Use environment variables or flutter_dotenv for configuration
+- Implement proper authentication token storage (flutter_secure_storage)
+- Validate all user inputs
+- Use HTTPS for all network requests
+
+## TESTING (mention when relevant)
+
+- Write unit tests for business logic
+- Write widget tests for UI components
+- Use integration tests for critical user flows
+- Mock API calls in tests
+
+## PACKAGE USAGE
+
+- Prefer official Flutter packages or well-maintained community packages
+- Keep dependencies up to date but test thoroughly after updates
+- Use specific package versions, not ^ or latest
+- Check package maintenance status and community support before adding
+
+## CODE GENERATION
+
+- When using code generation (json_serializable, freezed, retrofit), always include:
+  - Proper part statements
+  - Build runner commands in comments
+  - Generated files in .gitignore if appropriate
+
+## COMMENTS & DOCUMENTATION
+
+- Add TODO comments for incomplete features
+- Document complex logic with clear explanations
+- Use /// for public API documentation
+- Keep README updated with setup instructions
+
+---
+
+# UI/UX BEST PRACTICES FOR FLUTTER
+
+## DESIGN SYSTEM (CRITICAL - ALWAYS IMPLEMENT FIRST)
+
+### Create Centralized Theme Files
+Always create these files in lib/core/theme/:
+- app_colors.dart - All color definitions
+- app_text_styles.dart - All text style definitions
+- app_spacing.dart - All spacing constants
+- app_theme.dart - ThemeData configuration
+
+### Never Hardcode Design Tokens
+- Never hardcode colors, spacing, or text styles directly in widgets
+- Use const values for all design tokens
+- Implement both light and dark themes when applicable
+
+Example structure:
+lib/
+core/
+theme/
+app_colors.dart      // Define: primary, secondary, error, background, surface, textPrimary, textSecondary, divider
+app_text_styles.dart // Define: headline1-2, body1-2, caption with proper fontSize, fontWeight, color, height
+app_spacing.dart     // Define: xs=4, sm=8, md=16, lg=24, xl=32, xxl=48 (8-point grid)
+app_theme.dart       // ThemeData with all configurations
+
+Example app_colors.dart:
+```dart
+class AppColors {
+  static const primary = Color(0xFF6C63FF);
+  static const secondary = Color(0xFF03DAC6);
+  static const background = Color(0xFFF5F5F5);
+  static const surface = Color(0xFFFFFFFF);
+  static const error = Color(0xFFB00020);
+  static const textPrimary = Color(0xFF000000);
+  static const textSecondary = Color(0xFF757575);
+  static const divider = Color(0xFFE0E0E0);
+}
+```
+
+Example app_spacing.dart:
+```dart
+class AppSpacing {
+  static const double xs = 4.0;
+  static const double sm = 8.0;
+  static const double md = 16.0;
+  static const double lg = 24.0;
+  static const double xl = 32.0;
+  static const double xxl = 48.0;
+}
+```
+
+## SPACING SYSTEM (MANDATORY)
+
+- ALWAYS use 8-point grid system for spacing
+- Define spacing constants: 4, 8, 16, 24, 32, 48 (multiples of 8)
+- Never use random spacing values like 13, 17, 23
+- Use SizedBox for spacing between widgets, not Padding for separation
+- Keep spacing consistent throughout the app
+
+Bad: `padding: EdgeInsets.all(13)`
+Good: `padding: EdgeInsets.all(AppSpacing.md)` where md = 16
+
+## RESPONSIVE DESIGN (REQUIRED)
+
+- Use flutter_screenutil for all dimensions: .w, .h, .sp, .r
+- Initialize ScreenUtil in main.dart with design dimensions (usually 375x812)
+- Create responsive breakpoints: mobile (<600), tablet (600-1200), desktop (>1200)
+- Use LayoutBuilder for complex responsive layouts
+- Test on multiple screen sizes
+
+Initialize in main.dart:
+```dart
+void main() {
+  runApp(
+    ScreenUtilInit(
+      designSize: Size(375, 812), // Your design dimensions
+      builder: (context, child) => MyApp(),
+    ),
+  );
+}
+```
+
+Usage:
+```dart
+Container(
+  width: 200.w,                      // Responsive width
+  height: 100.h,                     // Responsive height
+  padding: EdgeInsets.all(16.r),    // Responsive padding/radius
+  child: Text('Hello', style: TextStyle(fontSize: 18.sp)), // Responsive font
+)
+```
+
+## VISUAL HIERARCHY (CRITICAL)
+
+- Use size, weight, and color to create hierarchy
+- Primary content: Largest size (24-32sp), bold weight (700), primary color
+- Secondary content: Medium size (16-18sp), normal/medium weight (400-500), primary/secondary color
+- Tertiary content: Smallest size (12-14sp), light weight (400), muted/secondary color
+- Never make everything the same size/weight/color
+
+Example:
+```dart
+Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Text('Main Title', style: AppTextStyles.headline1),        // Large, bold
+    SizedBox(height: AppSpacing.sm),
+    Text('Subtitle', style: AppTextStyles.body1),              // Medium, normal
+    SizedBox(height: AppSpacing.xs),
+    Text('Caption', style: AppTextStyles.caption),             // Small, light
+  ],
+)
+```
+
+## LOADING STATES (MANDATORY - NEVER SKIP)
+
+- ALWAYS show loading indicators during async operations
+- Use shimmer effect for content placeholders (shimmer package)
+- Create skeleton screens that match your actual content layout
+- Never show blank screens while loading
+- Show progress percentage for long operations
+
+Required pattern:
+```dart
+if (isLoading) {
+  return ShimmerLoadingWidget(); // NOT just CircularProgressIndicator
+} else if (hasError) {
+  return ErrorStateWidget(onRetry: _loadData);
+} else if (isEmpty) {
+  return EmptyStateWidget();
+} else {
+  return ContentWidget();
+}
+```
+
+Shimmer example:
+```dart
+Shimmer.fromColors(
+  baseColor: Colors.grey[300]!,
+  highlightColor: Colors.grey[100]!,
+  child: Container(
+    width: 200.w,
+    height: 20.h,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(4.r),
+    ),
+  ),
+)
+```
+
+## EMPTY STATES (MANDATORY)
+
+- ALWAYS create meaningful empty states, never blank screens
+- Include: large icon (80-120r), title, description, and action button
+- Make empty states helpful and actionable
+- Use appropriate icons and messaging
+
+Required structure:
+```dart
+Center(
+  child: Padding(
+    padding: EdgeInsets.all(AppSpacing.xl),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.inbox_outlined, size: 120.r, color: AppColors.textSecondary.withOpacity(0.3)),
+        SizedBox(height: AppSpacing.lg),
+        Text('No Items Found', style: AppTextStyles.headline2, textAlign: TextAlign.center),
+        SizedBox(height: AppSpacing.sm),
+        Text('Add items to see them here', style: AppTextStyles.body1.copyWith(color: AppColors.textSecondary), textAlign: TextAlign.center),
+        SizedBox(height: AppSpacing.lg),
+        ElevatedButton(onPressed: () {}, child: Text('Add Item')),
+      ],
+    ),
+  ),
+)
+```
+
+## ERROR STATES (MANDATORY)
+
+- ALWAYS show user-friendly error messages, never raw errors
+- Include retry button for recoverable errors
+- Use appropriate error icons and colors
+- Log technical errors but show simple messages to users
+- Never show "Exception:", "Error:", or stack traces to users
+
+Required structure:
+```dart
+Center(
+  child: Padding(
+    padding: EdgeInsets.all(AppSpacing.xl),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.error_outline, size: 100.r, color: AppColors.error),
+        SizedBox(height: AppSpacing.lg),
+        Text('Oops! Something went wrong', style: AppTextStyles.headline2, textAlign: TextAlign.center),
+        SizedBox(height: AppSpacing.sm),
+        Text('Please try again', style: AppTextStyles.body1.copyWith(color: AppColors.textSecondary), textAlign: TextAlign.center),
+        SizedBox(height: AppSpacing.lg),
+        ElevatedButton.icon(onPressed: onRetry, icon: Icon(Icons.refresh), label: Text('Try Again')),
+      ],
+    ),
+  ),
+)
+```
+
+## INTERACTIVE FEEDBACK (REQUIRED)
+
+- ALWAYS provide visual feedback for user interactions
+- Use InkWell/InkResponse for ripple effects on tappable items
+- Add scale animations for button presses
+- Show state changes immediately (optimistic updates when appropriate)
+- Minimum tap target size: 48x48 logical pixels
+
+InkWell example:
+```dart
+InkWell(
+  onTap: () {},
+  borderRadius: BorderRadius.circular(12.r),
+  child: Container(
+    padding: EdgeInsets.all(AppSpacing.md),
+    child: Text('Tap me'),
+  ),
+)
+```
+
+Scale animation example:
+```dart
+class ScaleButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  
+  @override
+  _ScaleButtonState createState() => _ScaleButtonState();
+}
+
+class _ScaleButtonState extends State<ScaleButton> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scale;
+  
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(duration: Duration(milliseconds: 100), vsync: this);
+    _scale = Tween<double>(begin: 1.0, end: 0.95).animate(_controller);
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) { _controller.reverse(); widget.onTap(); },
+      onTapCancel: () => _controller.reverse(),
+      child: ScaleTransition(scale: _scale, child: widget.child),
+    );
+  }
+  
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+}
+```
+
+## CARDS AND ELEVATION
+
+- Use subtle shadows for elevation (blur: 10-20, opacity: 0.04-0.08)
+- Round corners: typically 12-16 radius
+- Add proper padding inside cards: 16-20
+- Use cards to group related content
+- Make cards tappable when they lead to details
+
+Example:
+```dart
+Container(
+  padding: EdgeInsets.all(AppSpacing.md),
+  decoration: BoxDecoration(
+    color: AppColors.surface,
+    borderRadius: BorderRadius.circular(16.r),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.04),
+        blurRadius: 20,
+        offset: Offset(0, 4),
+      ),
+    ],
+  ),
+  child: YourContent(),
+)
+```
+
+## FORMS AND INPUT (CRITICAL)
+
+- Always show field labels above input fields
+- Use appropriate keyboard types (email, phone, number)
+- Implement real-time validation with clear error messages
+- Show password visibility toggle for password fields
+- Disable submit button while form is invalid or submitting
+- Show success feedback after successful submission
+
+Example field:
+```dart
+Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Text('Email', style: AppTextStyles.body1.copyWith(fontWeight: FontWeight.w600)),
+    SizedBox(height: AppSpacing.sm),
+    TextFormField(
+      controller: _emailController,
+      keyboardType: TextInputType.emailAddress,
+      decoration: InputDecoration(
+        hintText: 'Enter your email',
+        prefixIcon: Icon(Icons.email_outlined),
+        filled: true,
+        fillColor: AppColors.surface,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.r),
+          borderSide: BorderSide(color: AppColors.divider),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.r),
+          borderSide: BorderSide(color: AppColors.primary, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.r),
+          borderSide: BorderSide(color: AppColors.error),
+        ),
+      ),
+      validator: (value) {
+        if (value == null || value.isEmpty) return 'Please enter your email';
+        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) return 'Please enter a valid email';
+        return null;
+      },
+    ),
+  ],
+)
+```
+
+## IMAGES (REQUIRED)
+
+- ALWAYS use cached_network_image for network images, NEVER Image.network
+- Provide placeholder (shimmer) while loading
+- Provide error widget for failed loads
+- Optimize image sizes before uploading
+- Use appropriate BoxFit (cover, contain, fill)
+
+Example:
+```dart
+CachedNetworkImage(
+  imageUrl: imageUrl,
+  imageBuilder: (context, imageProvider) => Container(
+    width: 100.w,
+    height: 100.h,
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(12.r),
+      image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
+    ),
+  ),
+  placeholder: (context, url) => Shimmer.fromColors(
+    baseColor: Colors.grey[300]!,
+    highlightColor: Colors.grey[100]!,
+    child: Container(width: 100.w, height: 100.h, color: Colors.white),
+  ),
+  errorWidget: (context, url, error) => Container(
+    width: 100.w,
+    height: 100.h,
+    color: AppColors.divider,
+    child: Icon(Icons.error, color: AppColors.error),
+  ),
+)
+```
+
+## NAVIGATION TRANSITIONS
+
+- Use custom page transitions, not default routes
+- Implement smooth animations (300ms duration recommended)
+- Use Hero animations for shared elements between screens
+- Consider: SlideTransition, FadeTransition, ScaleTransition
+
+Example:
+```dart
+class SlidePageRoute extends PageRouteBuilder {
+  final Widget page;
+  
+  SlidePageRoute({required this.page})
+      : super(
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            const begin = Offset(1.0, 0.0);
+            const end = Offset.zero;
+            const curve = Curves.easeInOutCubic;
+            var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+            return SlideTransition(position: animation.drive(tween), child: child);
+          },
+          transitionDuration: Duration(milliseconds: 300),
+        );
+}
+
+// Usage:
+Navigator.push(context, SlidePageRoute(page: DetailScreen()));
+```
+
+## SNACKBARS AND NOTIFICATIONS
+
+- Use styled snackbars with icons for different types (success, error, warning, info)
+- Position: floating at bottom with margins
+- Duration: 2-3 seconds for info, 4-5 seconds for errors
+- Include dismiss action for long messages
+- Use appropriate colors for each notification type
+
+Example:
+```dart
+ScaffoldMessenger.of(context).showSnackBar(
+  SnackBar(
+    content: Row(
+      children: [
+        Icon(Icons.check_circle, color: Colors.white),
+        SizedBox(width: AppSpacing.sm),
+        Expanded(child: Text('Success message')),
+      ],
+    ),
+    backgroundColor: Colors.green,
+    behavior: SnackBarBehavior.floating,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+    margin: EdgeInsets.all(AppSpacing.md),
+    duration: Duration(seconds: 3),
+  ),
+);
+```
+
+## LISTS AND SCROLLING
+
+- Use ListView.builder for long lists, NEVER ListView with children
+- Implement pull-to-refresh for content that updates
+- Add pagination/infinite scroll for large datasets
+- Use ListView.separated for consistent item spacing
+- Show loading indicator at bottom when loading more items
+
+Example:
+```dart
+RefreshIndicator(
+  onRefresh: _loadData,
+  color: AppColors.primary,
+  child: ListView.separated(
+    itemCount: items.length,
+    separatorBuilder: (context, index) => SizedBox(height: AppSpacing.md),
+    itemBuilder: (context, index) => ItemWidget(items[index]),
+  ),
+)
+```
+
+## BOTTOM SHEETS AND DIALOGS
+
+- Round top corners of bottom sheets (24 radius)
+- Add drag handle bar at top of bottom sheets
+- Use isScrollControlled: true for tall bottom sheets
+- Make dialogs dismissible with barrier tap
+- Keep dialog content focused and concise
+
+Example:
+```dart
+showModalBottomSheet(
+  context: context,
+  isScrollControlled: true,
+  backgroundColor: Colors.transparent,
+  builder: (context) => Container(
+    height: MediaQuery.of(context).size.height * 0.75,
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.only(
+        topLeft: Radius.circular(24.r),
+        topRight: Radius.circular(24.r),
+      ),
+    ),
+    child: Column(
+      children: [
+        SizedBox(height: AppSpacing.sm),
+        Container(width: 40.w, height: 4.h, decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(2.r))),
+        // Content here
+      ],
+    ),
+  ),
+);
+```
+
+## ANIMATIONS
+
+- Use Lottie for complex animations (lottie package)
+- Keep animations subtle and purposeful, not excessive
+- Duration: 200-400ms for micro-interactions
+- Use Curves.easeInOut for natural motion
+- Animate state changes (expand/collapse, show/hide)
+
+## ACCESSIBILITY (REQUIRED)
+
+- Ensure text contrast ratio meets WCAG standards (4.5:1 for normal text)
+- Minimum font size: 14sp for body text
+- Minimum tap target: 48x48 logical pixels
+- Add semantic labels for icons and images
+- Support dynamic text sizing
+
+## COLORS AND THEMING
+
+- Define primary, secondary, error, background, surface colors in AppColors
+- Use color with opacity for disabled states (.withOpacity(0.5))
+- Support both light and dark themes when applicable
+- Use Theme.of(context) to access theme colors
+- Never use Colors.black or Colors.white directly in widgets, use theme colors
+
+## TYPOGRAPHY
+
+- Define text styles in AppTextStyles: headline1-2, body1-2, caption, button
+- Use proper font weights: 400 (normal), 500 (medium), 600 (semibold), 700 (bold)
+- Line height: 1.2 for headers, 1.5 for body text
+- Use google_fonts package for custom fonts
+- Keep font family consistent throughout app
+
+---
+
+# CRITICAL DO NOTs AND ALWAYS
+
+## DO NOT:
+- Show blank screens (always show loading/empty/error states)
+- Use Image.network (use cached_network_image)
+- Use ListView with children for long lists (use ListView.builder)
+- Hardcode colors, spacing, or text styles in widgets
+- Use random spacing values (stick to 8-point grid: 4, 8, 16, 24, 32, 48)
+- Show raw error messages to users (show friendly messages)
+- Skip const constructors
+- Use setState when better state management is available
+- Make everything the same size/weight/color (no visual hierarchy)
+- Forget to provide visual feedback for interactions
+- Use hardcoded sizes (use .w, .h, .sp, .r for responsiveness)
+
+## ALWAYS:
+- Implement design system first (AppColors, AppSpacing, AppTextStyles)
+- Show loading states with shimmer (not just CircularProgressIndicator)
+- Provide empty states with helpful messages and icons
+- Handle errors gracefully with retry options
+- Make UI responsive with flutter_screenutil
+- Use proper spacing (8-point grid system)
+- Provide visual feedback for all interactions
+- Test on multiple screen sizes
+- Use cached_network_image for all network images
+- Implement pull-to-refresh where content updates
+- Add Hero animations for shared elements
+- Use ListView.builder for lists
+- Validate forms before submission
+- Dispose controllers in dispose() method
+- Use appropriate keyboard types for text fields
+- Add password visibility toggle for password fields
+
+---
+
+# CODE GENERATION GUIDELINES
+
+When generating code:
+1. Ask clarifying questions if requirements are unclear
+2. Provide complete, working code, not snippets
+3. Include necessary imports at the top
+4. Add proper error handling with try-catch
+5. Follow the patterns already established in the project
+6. Suggest improvements when you see anti-patterns
+7. Explain complex decisions with inline comments
+8. Always implement all 4 states: loading, error, empty, success
+9. Create design system files if they don't exist
+10. Use const constructors wherever possible
+
+## When Creating Any UI Component, ALWAYS Ask:
+1. Does this look good on all screen sizes? (Use .w, .h, .sp, .r)
+2. What happens when loading? (Show shimmer)
+3. What happens when there's an error? (Show error state with retry)
+4. What happens when there's no data? (Show empty state)
+5. Is there proper visual feedback? (InkWell, scale animation)
+6. Are the spacing and colors consistent with design system? (AppSpacing, AppColors)
+7. Is this performant? (const, builders, proper keys)
+8. Are forms validated? (Form validation, appropriate keyboard types)
+9. Are images cached? (cached_network_image with placeholder and error)
+10. Is there pull-to-refresh for dynamic content?
+
+Generate production-ready code that is maintainable, performant, and follows ALL these Flutter UI/UX best practices without exception.
+
+---
+
+# ESSENTIAL PACKAGES TO USE
+
+## UI/UX:
+- flutter_screenutil: For responsive design (.w, .h, .sp, .r)
+- cached_network_image: For all network images
+- shimmer: For loading placeholders
+- lottie: For animations from LottieFiles
+- google_fonts: For custom fonts
+
+## State Management:
+- provider or riverpod: For dependency injection and state
+- bloc/flutter_bloc: For complex state management
+
+## API & Network:
+- dio: For HTTP requests
+- json_serializable: For JSON parsing
+- freezed: For immutable data classes
+- retrofit: For type-safe API calls
+
+## Storage:
+- shared_preferences: For simple key-value storage
+- hive: For local NoSQL database
+- flutter_secure_storage: For sensitive data
+
+## Utilities:
+- intl: For date formatting and internationalization
+- url_launcher: For launching URLs, calls, emails
+- permission_handler: For runtime permissions
+- connectivity_plus: For internet connectivity checks
+
+Remember: Always check if a package is well-maintained and actively supported before using it.

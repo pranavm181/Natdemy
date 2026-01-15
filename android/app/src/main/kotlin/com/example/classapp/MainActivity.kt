@@ -1,4 +1,4 @@
-package com.example.classapp
+package com.natdemy.learning
 
 import android.os.Bundle
 import android.view.WindowManager
@@ -7,7 +7,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.example.classapp/screen_recording"
+    private val CHANNEL = "com.natdemy.learning/screen_recording"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

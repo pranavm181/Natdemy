@@ -3,6 +3,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'dart:async';
 import 'screens/splash_screen.dart';
 import 'providers/student_provider.dart';
@@ -10,182 +11,58 @@ import 'providers/courses_provider.dart';
 import 'providers/enrolled_courses_provider.dart';
 import 'providers/banners_provider.dart';
 import 'providers/testimonials_provider.dart';
+import 'core/theme/app_theme.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Preload Google Fonts for faster rendering
-  await Future.wait([
-    GoogleFonts.pendingFonts([
-      GoogleFonts.inter(),
-      GoogleFonts.lato(),
-    ]),
-    // Mark app as restarted for cache clearing
-    SharedPreferences.getInstance().then((prefs) async {
-      await prefs.setBool('app_restarted', true);
-      await prefs.setString('app_last_run', DateTime.now().toIso8601String());
-    }),
-  ]);
+  // Initialize standard web view settings if needed
+  // No need to await fonts or prefs here - it blocks the cold start.
+  // We handle initial setup in the SplashScreen background.
+  
+  // Non-blocking background setup
+  unawaited(_backgroundSetup());
   
   runApp(const MyApp());
 }
+
+Future<void> _backgroundSetup() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('app_restarted', true);
+    await prefs.setString('app_last_run', DateTime.now().toIso8601String());
+  } catch (e) {
+    debugPrint('Error in background setup: $e');
+  }
+}
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => StudentProvider()),
-        ChangeNotifierProvider(create: (_) => CoursesProvider()),
-        ChangeNotifierProvider(create: (_) => EnrolledCoursesProvider()),
-        ChangeNotifierProvider(create: (_) => BannersProvider()),
-        ChangeNotifierProvider(create: (_) => TestimonialsProvider()),
-      ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'Natdemy',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF582DB0),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-        textTheme: GoogleFonts.interTextTheme().apply(
-          bodyColor: const Color(0xFF1E293B),
-          displayColor: const Color(0xFF1E293B),
-        ).copyWith(
-          // Titles - Inter with italic, color, and uppercase (thicker for importance)
-          headlineLarge: GoogleFonts.inter(
-            fontWeight: FontWeight.w700,
-            fontStyle: FontStyle.italic,
-            color: const Color(0xFF000000),
+    return ScreenUtilInit(
+      designSize: const Size(375, 812), // Standard mobile design size
+      minTextAdapt: true,
+      splitScreenMode: true,
+      builder: (context, child) {
+        return MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => StudentProvider()),
+            ChangeNotifierProvider(create: (_) => CoursesProvider()),
+            ChangeNotifierProvider(create: (_) => EnrolledCoursesProvider()),
+            ChangeNotifierProvider(create: (_) => BannersProvider()),
+            ChangeNotifierProvider(create: (_) => TestimonialsProvider()),
+          ],
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'Natdemy',
+            theme: AppTheme.lightTheme,
+            home: const SplashScreen(),
           ),
-          headlineMedium: GoogleFonts.inter(
-            fontWeight: FontWeight.w700,
-            fontStyle: FontStyle.italic,
-            color: const Color(0xFF1E293B),
-          ),
-          headlineSmall: GoogleFonts.inter(
-            fontWeight: FontWeight.w700,
-            fontStyle: FontStyle.italic,
-            color: const Color(0xFF0F172A),
-          ),
-          titleLarge: GoogleFonts.inter(
-            fontWeight: FontWeight.w700,
-            fontStyle: FontStyle.italic,
-            color: const Color(0xFF000000),
-          ),
-          titleMedium: GoogleFonts.inter(
-            fontWeight: FontWeight.w700,
-            fontStyle: FontStyle.italic,
-            color: const Color(0xFF1E293B),
-          ),
-          titleSmall: GoogleFonts.inter(
-            fontWeight: FontWeight.w600,
-            fontStyle: FontStyle.italic,
-            color: const Color(0xFF0F172A),
-          ),
-          displayLarge: GoogleFonts.inter(
-            fontWeight: FontWeight.w700,
-            fontStyle: FontStyle.italic,
-            color: const Color(0xFF000000),
-          ),
-          displayMedium: GoogleFonts.inter(
-            fontWeight: FontWeight.w700,
-            fontStyle: FontStyle.italic,
-            color: const Color(0xFF1E293B),
-          ),
-          displaySmall: GoogleFonts.inter(
-            fontWeight: FontWeight.w700,
-            fontStyle: FontStyle.italic,
-            color: const Color(0xFF0F172A),
-          ),
-          // Body text - Lato
-          bodyLarge: GoogleFonts.lato(fontWeight: FontWeight.w300),
-          bodyMedium: GoogleFonts.lato(fontWeight: FontWeight.w300),
-          bodySmall: GoogleFonts.lato(fontWeight: FontWeight.w300),
-          // Labels - Lato
-          labelLarge: GoogleFonts.lato(fontWeight: FontWeight.w300),
-          labelMedium: GoogleFonts.lato(fontWeight: FontWeight.w300),
-          labelSmall: GoogleFonts.lato(fontWeight: FontWeight.w300),
-        ),
-        cardTheme: CardThemeData(
-          elevation: 8,
-          shadowColor: Colors.black.withOpacity(0.15),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(
-              color: Color(0xFF582DB0),
-              width: 2,
-            ),
-          ),
-          color: Colors.white,
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF582DB0),
-            foregroundColor: Colors.white,
-            elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            textStyle: GoogleFonts.lato(fontWeight: FontWeight.w300),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF582DB0)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF582DB0)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF582DB0), width: 2),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          labelStyle: GoogleFonts.lato(fontWeight: FontWeight.w300),
-          hintStyle: GoogleFonts.lato(fontWeight: FontWeight.w300),
-        ),
-        appBarTheme: AppBarTheme(
-          elevation: 0,
-          centerTitle: true,
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
-          foregroundColor: const Color(0xFF1E293B),
-          titleTextStyle: GoogleFonts.inter(
-            color: const Color(0xFF000000),
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            fontStyle: FontStyle.italic,
-            letterSpacing: 1.0,
-          ),
-        ),
-        // Additional theme for buttons to use Lato
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            textStyle: GoogleFonts.lato(fontWeight: FontWeight.w300),
-          ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            textStyle: GoogleFonts.lato(fontWeight: FontWeight.w300),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            textStyle: GoogleFonts.lato(fontWeight: FontWeight.w300),
-          ),
-        ),
-      ),
-      home: const SplashScreen(),
-      ),
+        );
+      },
     );
   }
 }

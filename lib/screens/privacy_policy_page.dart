@@ -1,3 +1,7 @@
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../utils/animations.dart';
@@ -8,20 +12,20 @@ class PrivacyPolicyPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: CupertinoNavigationBarBackButton(
           onPressed: () => Navigator.of(context).pop(),
-          color: Colors.black,
+          color: AppColors.textPrimary,
         ),
-        title: const Text(
+        title: Text(
           'PRIVACY POLICY',
-          style: TextStyle(
-            color: Color(0xFF582DB0),
-            fontWeight: FontWeight.w900,
-            fontSize: 20,
+          style: AppTextStyles.headline1.copyWith(
+            color: AppColors.primary,
+            fontSize: 20.sp,
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -29,31 +33,30 @@ class PrivacyPolicyPage extends StatelessWidget {
       body: AppAnimations.fadeSlideIn(
         delay: 100,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: EdgeInsets.symmetric(horizontal: 20.w),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 16),
+              SizedBox(height: 16.h),
               // Header
-              const Text(
+              Text(
                 'Privacy Policy',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF000000),
-                  letterSpacing: 0.5,
+                style: AppTextStyles.headline1.copyWith(
+                  fontSize: 28.sp,
+                  color: AppColors.textPrimary,
+                  letterSpacing: 0.5.w,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8.h),
               Text(
                 'Last updated: ${DateTime.now().toString().split(' ')[0]}',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
+                style: AppTextStyles.caption.copyWith(
+                  fontSize: 14.sp,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 40),
+              SizedBox(height: 40.h),
 
               // Introduction
               _buildSectionTitle('INTRODUCTION'),
@@ -184,22 +187,21 @@ class PrivacyPolicyPage extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF000000),
-            letterSpacing: 0.5,
+          style: AppTextStyles.headline2.copyWith(
+            fontSize: 24.sp,
+            color: AppColors.textPrimary,
+            letterSpacing: 0.5.w,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8.h),
         Container(
-          height: 3,
-          width: 120,
+          height: 3.h,
+          width: 120.w,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+            gradient: LinearGradient(
+              colors: [AppColors.primary, AppColors.primaryLight],
             ),
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(2.r),
           ),
         ),
       ],
@@ -209,12 +211,12 @@ class PrivacyPolicyPage extends StatelessWidget {
   Widget _buildSectionContent(String content) {
     return Text(
       content,
-      style: const TextStyle(
-        fontSize: 16,
+      style: AppTextStyles.body1.copyWith(
+        fontSize: 16.sp,
         height: 1.8,
-        color: Color(0xFF1E293B),
+        color: AppColors.textPrimary,
         fontWeight: FontWeight.w600,
-        letterSpacing: 0.3,
+        letterSpacing: 0.3.w,
       ),
     );
   }

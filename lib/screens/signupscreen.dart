@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../data/auth_helper.dart';
@@ -402,7 +406,7 @@ class _SignupScreenState extends State<SignupScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF8B5CF6), Color(0xFF582DB0)],
+            colors: [AppColors.primaryLight, AppColors.primary],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -410,128 +414,132 @@ class _SignupScreenState extends State<SignupScreen> {
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.all(AppSpacing.lg.r),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 440),
+                constraints: BoxConstraints(maxWidth: 440.w),
                 child: Card(
                   elevation: 8,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(24.r),
+                    side: const BorderSide(color: AppColors.border, width: 1),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(32),
+                    padding: EdgeInsets.all(AppSpacing.xl.r),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Image.asset(
                           'assets/images/natdemy_logo2.png',
-                          height: 80,
+                          height: 80.h,
                           fit: BoxFit.contain,
                           errorBuilder: (context, error, stackTrace) {
-                            return const Icon(
+                            return Icon(
                               Icons.person_add_outlined,
-                              size: 56,
-                              color: Color(0xFF582DB0),
+                              size: 56.r,
+                              color: AppColors.primary,
                             );
                           },
                         ),
-                        const SizedBox(height: 24),
+                        SizedBox(height: AppSpacing.lg.h),
                         Text(
                           'CREATE ACCOUNT',
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF1E293B),
-                              ),
+                          style: AppTextStyles.headline2,
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: AppSpacing.sm.h),
                         Text(
                           'Join us and start learning today',
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: const Color(0xFF64748B),
-                              ),
+                          style: AppTextStyles.body1.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
-                        const SizedBox(height: 32),
+                        SizedBox(height: AppSpacing.xl.h),
                         TextField(
                           controller: _studentIdController,
                           textInputAction: TextInputAction.next,
+                          style: AppTextStyles.body1,
                           decoration: const InputDecoration(
                             labelText: 'Student ID',
                             prefixIcon: Icon(Icons.badge_outlined),
                             helperText: 'Enter the student ID provided to you',
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: AppSpacing.md.h),
                         TextField(
                           controller: _nameController,
                           textInputAction: TextInputAction.next,
+                          style: AppTextStyles.body1,
                           decoration: const InputDecoration(
                             labelText: 'Full name',
                             prefixIcon: Icon(Icons.person_outline),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: AppSpacing.md.h),
                         TextField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
+                          style: AppTextStyles.body1,
                           decoration: const InputDecoration(
                             labelText: 'Email',
                             prefixIcon: Icon(Icons.email_outlined),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: AppSpacing.md.h),
                         TextField(
                           controller: _phoneController,
                           keyboardType: TextInputType.phone,
                           textInputAction: TextInputAction.next,
+                          style: AppTextStyles.body1,
                           decoration: const InputDecoration(
                             labelText: 'Phone number',
                             prefixIcon: Icon(Icons.phone_outlined),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: AppSpacing.md.h),
                         TextField(
                           controller: _passwordController,
                           obscureText: true,
                           textInputAction: TextInputAction.next,
+                          style: AppTextStyles.body1,
                           decoration: const InputDecoration(
                             labelText: 'Password',
                             prefixIcon: Icon(Icons.lock_outline),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: AppSpacing.md.h),
                         TextField(
                           controller: _confirmController,
                           obscureText: true,
                           textInputAction: TextInputAction.next,
+                          style: AppTextStyles.body1,
                           decoration: const InputDecoration(
                             labelText: 'Confirm password',
                             prefixIcon: Icon(Icons.lock_reset_outlined),
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        SizedBox(height: AppSpacing.lg.h),
                         // Course Selection
                         if (_isLoadingCourses)
-                          const Center(
+                          Center(
                             child: Padding(
-                              padding: EdgeInsets.all(16.0),
-                              child: ThemePulsingDotsIndicator(size: 10.0, spacing: 12.0),
+                              padding: EdgeInsets.all(AppSpacing.md.r),
+                              child: const ThemePulsingDotsIndicator(size: 10.0, spacing: 12.0),
                             ),
                           )
                         else if (_courses.isEmpty)
                           Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: EdgeInsets.all(AppSpacing.md.r),
                             decoration: BoxDecoration(
                               color: Colors.orange.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(8.r),
                               border: Border.all(color: Colors.orange),
                             ),
                             child: Row(
                               children: [
                                 const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                                const SizedBox(width: 12),
+                                SizedBox(width: AppSpacing.sm.w),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -543,13 +551,13 @@ class _SignupScreenState extends State<SignupScreen> {
                                           color: Colors.orange,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
+                                      SizedBox(height: 4.h),
                                       TextButton.icon(
                                         onPressed: _loadCoursesAndStreams,
                                         icon: const Icon(Icons.refresh, size: 18),
                                         label: const Text('Retry'),
                                         style: TextButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                                         ),
                                       ),
                                     ],
@@ -561,6 +569,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         else ...[
                           DropdownButtonFormField<Course>(
                             value: _selectedCourse,
+                            style: AppTextStyles.body1,
                             decoration: const InputDecoration(
                               labelText: 'Select Course *',
                               prefixIcon: Icon(Icons.menu_book_outlined),
@@ -572,6 +581,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                 child: Text(
                                   course.title,
                                   overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.body1,
                                 ),
                               );
                             }).toList(),
@@ -586,10 +596,11 @@ class _SignupScreenState extends State<SignupScreen> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: AppSpacing.md.h),
                           // Stream Selection
                           DropdownButtonFormField<CourseStream>(
                             value: _selectedStream,
+                            style: AppTextStyles.body1,
                             decoration: InputDecoration(
                               labelText: 'Select Stream *',
                               prefixIcon: const Icon(Icons.stream),
@@ -609,6 +620,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                       child: Text(
                                         stream.name,
                                         overflow: TextOverflow.ellipsis,
+                                        style: AppTextStyles.body1,
                                       ),
                                     );
                                   }).toList(),
@@ -627,33 +639,33 @@ class _SignupScreenState extends State<SignupScreen> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 24),
+                          SizedBox(height: AppSpacing.lg.h),
                         ],
                         SizedBox(
-                          height: 52,
+                          height: 52.h,
                           child: FilledButton.icon(
                             onPressed: _isLoading ? null : _signUp,
                             icon: _isLoading
-                                ? const Padding(
-                                    padding: EdgeInsets.all(8.0),
-                                    child: ThemePulsingDotsIndicator(size: 8.0, spacing: 6.0, color: Colors.white),
+                                ? Padding(
+                                    padding: EdgeInsets.all(8.0.r),
+                                    child: const ThemePulsingDotsIndicator(size: 8.0, spacing: 6.0, color: Colors.white),
                                   )
-                                : const Icon(Icons.person_add_alt_1, size: 20),
-                            label: const Text(
+                                : Icon(Icons.person_add_alt_1, size: 20.r),
+                            label: Text(
                               'Sign up',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                              style: AppTextStyles.button.copyWith(fontWeight: FontWeight.w600),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: AppSpacing.md.h),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
                               'Already have an account? ',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: const Color(0xFF64748B),
-                                  ),
+                              style: AppTextStyles.body1.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
                             ),
                             TextButton(
                               onPressed: () {
@@ -664,9 +676,15 @@ class _SignupScreenState extends State<SignupScreen> {
                                 );
                               },
                               style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                               ),
-                              child: const Text('Sign in'),
+                              child: Text(
+                                'Sign in',
+                                style: AppTextStyles.body1.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                           ],
                         ),

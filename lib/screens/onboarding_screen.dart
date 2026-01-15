@@ -1,3 +1,7 @@
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'loginscreen.dart';
@@ -24,19 +28,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: 'Explore Courses',
       description: 'Discover a wide range of courses\nDesigned to help you succeed',
       icon: Icons.menu_book_outlined,
-      color: Color(0xFF582DB0),
+      color: AppColors.primary,
     ),
     OnboardingPage(
       title: 'Learn at Your Pace',
       description: 'Access materials, videos, and resources\nStudy on your own schedule',
       icon: Icons.play_circle_outline,
-      color: Color(0xFF8B5CF6),
+      color: AppColors.primaryLight,
     ),
     OnboardingPage(
       title: 'Track Your Progress',
       description: 'Monitor your learning journey\nStay motivated and achieve goals',
       icon: Icons.trending_up,
-      color: Color(0xFFA1C95C),
+      color: AppColors.accent,
     ),
   ];
 
@@ -66,9 +70,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF8B5CF6), Color(0xFF582DB0)],
+            colors: [AppColors.primaryLight, AppColors.primary],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -78,16 +82,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             children: [
               // Skip Button
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(16.r),
                 child: Align(
                   alignment: Alignment.topRight,
                   child: TextButton(
                     onPressed: _completeOnboarding,
-                    child: const Text(
+                    child: Text(
                       'Skip',
-                      style: TextStyle(
+                      style: AppTextStyles.button.copyWith(
                         color: Colors.white,
-                        fontSize: 16,
+                        fontSize: 16.sp,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -122,7 +126,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
               // Navigation Buttons
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 16.h),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -135,17 +139,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             curve: Curves.easeInOut,
                           );
                         },
-                        child: const Text(
+                        child: Text(
                           'Back',
-                          style: TextStyle(
+                          style: AppTextStyles.button.copyWith(
                             color: Colors.white70,
-                            fontSize: 16,
+                            fontSize: 16.sp,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       )
                     else
-                      const SizedBox(width: 64),
+                      SizedBox(width: 64.w),
 
                     // Next/Get Started Button
                     ElevatedButton(
@@ -161,21 +165,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
-                        foregroundColor: const Color(0xFF582DB0),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 32,
-                          vertical: 16,
+                        foregroundColor: AppColors.primary,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 32.w,
+                          vertical: 16.h,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
+                          borderRadius: BorderRadius.circular(30.r),
                         ),
                         elevation: 4,
                       ),
                       child: Text(
                         _currentPage < _pages.length - 1 ? 'Next' : 'Get Started',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                        style: AppTextStyles.button.copyWith(
+                          fontSize: 16.sp,
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
@@ -216,7 +221,7 @@ class _OnboardingPageWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: EdgeInsets.all(32.r),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -224,19 +229,19 @@ class _OnboardingPageWidget extends StatelessWidget {
           if (page.image != null)
             Image.asset(
               page.image!,
-              height: 200,
+              height: 200.h,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) {
                 return Container(
-                  height: 200,
-                  width: 200,
+                  height: 200.h,
+                  width: 200.h,
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.school,
-                    size: 100,
+                    size: 100.r,
                     color: Colors.white,
                   ),
                 );
@@ -244,54 +249,54 @@ class _OnboardingPageWidget extends StatelessWidget {
             )
           else if (page.icon != null)
             Container(
-              height: 200,
-              width: 200,
+              height: 200.h,
+              width: 200.h,
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.2),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
                     color: Colors.white.withOpacity(0.3),
-                    blurRadius: 40,
-                    spreadRadius: 10,
+                    blurRadius: 40.r,
+                    spreadRadius: 10.r,
                   ),
                 ],
               ),
               child: Icon(
                 page.icon,
-                size: 100,
+                size: 100.r,
                 color: Colors.white,
               ),
             ),
 
-          const SizedBox(height: 60),
+          SizedBox(height: 60.h),
 
           // Title
           Text(
             page.title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: AppTextStyles.headline1.copyWith(
               color: Colors.white,
-              fontSize: 32,
+              fontSize: 32.sp,
               fontWeight: FontWeight.w900,
               fontStyle: FontStyle.italic,
-              letterSpacing: 1,
+              letterSpacing: 1.w,
               height: 1.2,
             ),
           ),
 
-          const SizedBox(height: 24),
+          SizedBox(height: 24.h),
 
           // Description
           Text(
             page.description,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: AppTextStyles.body1.copyWith(
               color: Colors.white.withOpacity(0.9),
-              fontSize: 18,
+              fontSize: 18.sp,
               fontWeight: FontWeight.w500,
               height: 1.5,
-              letterSpacing: 0.5,
+              letterSpacing: 0.5.w,
             ),
           ),
         ],
@@ -309,12 +314,12 @@ class _PageIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      width: isActive ? 24 : 8,
-      height: 8,
+      margin: EdgeInsets.symmetric(horizontal: 4.w),
+      width: isActive ? 24.w : 8.w,
+      height: 8.h,
       decoration: BoxDecoration(
         color: isActive ? Colors.white : Colors.white.withOpacity(0.4),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(4.r),
       ),
     );
   }

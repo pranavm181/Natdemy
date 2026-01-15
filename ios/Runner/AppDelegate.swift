@@ -3,7 +3,7 @@ import UIKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
-  private let screenRecordingChannelName = "com.example.classapp/screen_recording"
+  private let screenRecordingChannelName = "com.natdemy.learning/screen_recording"
   private var screenRecordingBlocked = true
   private var screenShieldView: UIView?
 

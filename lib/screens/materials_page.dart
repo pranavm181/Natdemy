@@ -1,3 +1,8 @@
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
+import '../widgets/shimmer_loading.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../data/materials_config.dart';
@@ -5,7 +10,6 @@ import '../data/material.dart';
 import '../data/joined_courses.dart';
 import '../api/material_service.dart';
 import '../api/course_service.dart';
-import '../widgets/theme_loading_indicator.dart';
 import '../utils/animations.dart';
 import 'pdf_viewer_screen.dart';
 
@@ -183,61 +187,80 @@ class _MaterialsPageState extends State<MaterialsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: CupertinoNavigationBarBackButton(
           onPressed: () => Navigator.of(context).pop(),
-          color: Colors.black,
+          color: AppColors.textPrimary,
         ),
-        title: const Text(
+        title: Text(
           'MATERIALS',
-          style: TextStyle(
-            color: Color(0xFF582DB0),
-            fontWeight: FontWeight.w900,
-            fontSize: 20,
+          style: AppTextStyles.headline1.copyWith(
+            color: AppColors.primary,
+            fontSize: 20.sp,
             fontStyle: FontStyle.italic,
           ),
         ),
       ),
       body: RefreshIndicator(
         onRefresh: _loadMaterials,
+        color: AppColors.primary,
+        backgroundColor: AppColors.surface,
         child: _isLoading
-            ? const Center(child: ThemePulsingDotsIndicator(size: 12.0, spacing: 16.0))
+            ? ListView.separated(
+                padding: EdgeInsets.all(16.r),
+                itemBuilder: (context, index) => ShimmerLoading.rectangular(
+                  height: 90.h,
+                  width: double.infinity,
+                  borderRadius: 16.r,
+                ),
+                separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                itemCount: 8,
+              )
             : _materials.isEmpty
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.folder_open, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No materials available',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                        ),
-                        if (_errorMessage != null) ...[
-                          const SizedBox(height: 8),
+                    child: Padding(
+                      padding: EdgeInsets.all(32.r),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(24.r),
+                            decoration: BoxDecoration(
+                              color: (_errorMessage != null ? AppColors.error : AppColors.primary).withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              _errorMessage != null ? Icons.error_outline : Icons.folder_open,
+                              size: 64.r,
+                              color: _errorMessage != null ? AppColors.error : AppColors.primary,
+                            ),
+                          ),
+                          SizedBox(height: 24.h),
                           Text(
-                            _errorMessage!,
-                            style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                            _errorMessage ?? 'No materials available',
+                            style: AppTextStyles.body1.copyWith(color: AppColors.textSecondary),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: 32.h),
+                          FilledButton.icon(
+                            onPressed: _loadMaterials,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('RETRY'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 16.h),
+                            ),
                           ),
                         ],
-                        const SizedBox(height: 24),
-                        FilledButton.icon(
-                          onPressed: _loadMaterials,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF582DB0),
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   )
                 : ListView.separated(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(16.r),
                     itemBuilder: (context, index) {
                       final m = _materials[index];
                       // Ensure URL is properly formatted
@@ -247,97 +270,101 @@ class _MaterialsPageState extends State<MaterialsPage> {
                       return AnimatedListItem(
                         index: index,
                         child: Card(
-                        elevation: 2,
-                        shadowColor: Colors.black.withOpacity(0.1),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: Colors.grey[300]!, width: 1),
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          leading: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.picture_as_pdf, color: Color(0xFFEF4444), size: 24),
+                          elevation: 2,
+                          shadowColor: AppColors.shadow,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16.r),
+                            side: BorderSide(color: AppColors.divider, width: 1.r),
                           ),
-                          title: Text(
-                            m.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1E293B),
-                              fontSize: 16,
+                          child: ListTile(
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                            leading: Container(
+                              padding: EdgeInsets.all(12.r),
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12.r),
+                              ),
+                              child: Icon(Icons.picture_as_pdf, color: AppColors.error, size: 24.r),
                             ),
-                          ),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (m.sizeLabel != null)
-                                  Row(
-                                    children: [
-                                      Icon(Icons.file_present, size: 14, color: Colors.grey[600]),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        m.sizeLabel!,
-                                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                                      ),
-                                    ],
-                                  ),
-                                if (m.fileType != null) ...[
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.insert_drive_file, size: 12, color: Colors.grey[500]),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        m.fileType!.toUpperCase(),
-                                        style: TextStyle(color: Colors.grey[500], fontSize: 11),
-                                      ),
-                                    ],
-                                  ),
+                            title: Text(
+                              m.name,
+                              style: AppTextStyles.body1.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                                fontSize: 16.sp,
+                              ),
+                            ),
+                            subtitle: Padding(
+                              padding: EdgeInsets.only(top: 4.h),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (m.sizeLabel != null)
+                                    Row(
+                                      children: [
+                                        Icon(Icons.file_present, size: 14.r, color: AppColors.textSecondary),
+                                        SizedBox(width: 4.w),
+                                        Text(
+                                          m.sizeLabel!,
+                                          style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary, fontSize: 13.sp),
+                                        ),
+                                      ],
+                                    ),
+                                  if (m.fileType != null) ...[
+                                    SizedBox(height: 4.h),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.insert_drive_file, size: 12.r, color: AppColors.textSecondary.withOpacity(0.7)),
+                                        SizedBox(width: 4.w),
+                                        Text(
+                                          m.fileType!.toUpperCase(),
+                                          style: AppTextStyles.caption.copyWith(
+                                            color: AppColors.textSecondary.withOpacity(0.7),
+                                            fontSize: 11.sp,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
-                          ),
-                          trailing: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF582DB0).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
+                            trailing: Container(
+                              padding: EdgeInsets.all(10.r),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10.r),
+                              ),
+                              child: Icon(Icons.visibility_outlined, color: AppColors.primary, size: 20.r),
                             ),
-                            child: const Icon(Icons.visibility_outlined, color: Color(0xFF582DB0), size: 20),
-                          ),
-                          onTap: () {
-                            if (fullUrl.isNotEmpty) {
-                              debugPrint('📄 Opening material: ${m.name}');
-                              debugPrint('   URL: $fullUrl');
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => PdfViewerScreen(
-                                    pdfUrl: fullUrl,
-                                    pdfTitle: m.name,
-                                    allowDownload: false,
+                            onTap: () {
+                              if (fullUrl.isNotEmpty) {
+                                debugPrint('📄 Opening material: ${m.name}');
+                                debugPrint('   URL: $fullUrl');
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => PdfViewerScreen(
+                                      pdfUrl: fullUrl,
+                                      pdfTitle: m.name,
+                                      allowDownload: false,
+                                    ),
                                   ),
-                                ),
-                              );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Material URL is not available'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                            }
-                          },
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Material URL is not available'),
+                                    backgroundColor: AppColors.error,
+                                  ),
+                                );
+                              }
+                            },
+                          ),
                         ),
-                      ),
                       );
                     },
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (_, __) => SizedBox(height: 12.h),
                     itemCount: _materials.length,
                   ),
       ),

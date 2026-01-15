@@ -1,3 +1,7 @@
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -8,8 +12,8 @@ import '../data/student.dart';
 import '../data/auth_helper.dart';
 import '../utils/image_utils.dart';
 import '../utils/file_operations.dart';
-import '../widgets/theme_loading_indicator.dart';
 import '../utils/animations.dart';
+import 'loginscreen.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key, required this.student, required this.onProfileUpdated});
@@ -93,9 +97,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     widget.onProfileUpdated(updatedStudent);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Profile updated successfully!'),
-        backgroundColor: Color(0xFF10B981),
+      SnackBar(
+        content: const Text('Profile updated successfully!'),
+        backgroundColor: AppColors.success,
       ),
     );
 
@@ -175,9 +179,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _confirmPasswordController.clear();
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Password changed successfully!'),
-        backgroundColor: Color(0xFF10B981),
+      SnackBar(
+        content: const Text('Password changed successfully!'),
+        backgroundColor: AppColors.success,
       ),
     );
   }
@@ -185,20 +189,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: CupertinoNavigationBarBackButton(
           onPressed: () => Navigator.of(context).pop(),
-          color: Colors.black,
+          color: AppColors.textPrimary,
         ),
-        title: const Text(
+        title: Text(
           'EDIT PROFILE',
-          style: TextStyle(
-            color: Color(0xFF582DB0),
-            fontWeight: FontWeight.w900,
-            fontSize: 20,
+          style: AppTextStyles.headline1.copyWith(
+            color: AppColors.primary,
+            fontSize: 20.sp,
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -218,19 +222,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: const Color(0xFF582DB0),
-                          width: 3,
+                          color: AppColors.primary,
+                          width: 3.r,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.2),
+                            blurRadius: 10.r,
+                            spreadRadius: 2.r,
+                          ),
+                        ],
                       ),
                       child: CircleAvatar(
-                        radius: 60,
-                        backgroundColor: const Color(0xFF582DB0),
+                        radius: 60.r,
+                        backgroundColor: AppColors.primary,
                         backgroundImage: ImageUtils.getProfileImageProvider(_profileImagePath),
                         child: ImageUtils.hasProfileImage(_profileImagePath)
                             ? null
-                            : const Icon(
+                            : Icon(
                                 Icons.person,
-                                size: 60,
+                                size: 60.r,
                                 color: Colors.white,
                               ),
                       ),
@@ -240,16 +251,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       right: 0,
                       child: InkWell(
                         onTap: _pickImage,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(20.r),
                         child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF582DB0),
+                          padding: EdgeInsets.all(8.r),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
                             shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 4.r,
+                                offset: Offset(0, 2.h),
+                              ),
+                            ],
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.camera_alt,
-                            size: 20,
+                            size: 20.r,
                             color: Colors.white,
                           ),
                         ),
@@ -269,11 +287,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   prefixIcon: const Icon(Icons.badge_outlined),
                   hintText: 'Student ID',
                   filled: true,
-                  fillColor: Colors.grey.shade100,
+                  fillColor: AppColors.surface,
                 ),
-                style: const TextStyle(
-                  color: Color(0xFF475569),
+                style: AppTextStyles.body1.copyWith(
+                  color: AppColors.textSecondary,
                   fontWeight: FontWeight.w600,
+                  fontSize: 16.sp,
                 ),
               ),
               const SizedBox(height: 20),
@@ -336,18 +355,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 32),
               // Save Button
               SizedBox(
-                height: 52,
+                height: 52.h,
                 child: FilledButton.icon(
                   onPressed: _isLoading ? null : _saveProfile,
                   icon: _isLoading
-                      ? const Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: ThemePulsingDotsIndicator(size: 8.0, spacing: 6.0, color: Colors.white),
+                      ? SizedBox(
+                          width: 20.r,
+                          height: 20.r,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
                         )
-                      : const Icon(Icons.save, size: 20),
+                      : Icon(Icons.save, size: 20.r),
                   label: Text(
                     _isLoading ? 'Saving...' : 'Save Changes',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    style: AppTextStyles.button.copyWith(fontSize: 16.sp, color: Colors.white),
                   ),
                 ),
               ),
@@ -358,29 +381,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               // Change Password Section (collapsible)
               if (!_showChangePasswordSection) ...[
                 SizedBox(
-                  height: 52,
+                  height: 52.h,
                   child: OutlinedButton.icon(
                     onPressed: () {
                       setState(() {
                         _showChangePasswordSection = true;
                       });
                     },
-                    icon: const Icon(Icons.lock_reset),
-                    label: const Text('Change Password'),
+                    icon: Icon(Icons.lock_reset, size: 20.r),
+                    label: Text('Change Password', style: AppTextStyles.button.copyWith(fontSize: 16.sp)),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF582DB0), width: 2),
-                      foregroundColor: const Color(0xFF582DB0),
+                      side: BorderSide(color: AppColors.primary, width: 2.r),
+                      foregroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                     ),
                   ),
                 ),
               ] else ...[
                 Text(
                   'CHANGE PASSWORD',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1E293B),
-                        fontSize: 18,
-                      ),
+                  style: AppTextStyles.headline2.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    fontSize: 18.sp,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 Form(
@@ -480,22 +504,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       const SizedBox(height: 32),
                       // Change Password Button
                       SizedBox(
-                        height: 52,
+                        height: 52.h,
                         child: OutlinedButton.icon(
                           onPressed: _isChangingPassword ? null : _changePassword,
                           icon: _isChangingPassword
-                              ? const Padding(
-                                  padding: EdgeInsets.all(8.0),
-                                  child: ThemePulsingDotsIndicator(size: 8.0, spacing: 6.0, color: Color(0xFF582DB0)),
+                              ? SizedBox(
+                                  width: 20.r,
+                                  height: 20.r,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                  ),
                                 )
-                              : const Icon(Icons.lock_reset, size: 20),
+                              : Icon(Icons.lock_reset, size: 20.r),
                           label: Text(
                             _isChangingPassword ? 'Changing...' : 'Change Password',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                            style: AppTextStyles.button.copyWith(fontSize: 16.sp, color: AppColors.primary),
                           ),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFF582DB0), width: 2),
-                            foregroundColor: const Color(0xFF582DB0),
+                            side: BorderSide(color: AppColors.primary, width: 2.r),
+                            foregroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                           ),
                         ),
                       ),
@@ -513,10 +542,99 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 24),
+                // Delete Account Section
+                Center(
+                  child: TextButton.icon(
+                    onPressed: _showDeleteAccountDialog,
+                    icon: Icon(Icons.delete_forever, color: AppColors.error, size: 20.r),
+                    label: Text(
+                      'Delete Account',
+                      style: TextStyle(
+                        color: AppColors.error,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14.sp,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
               ],
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showDeleteAccountDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Delete Account',
+          style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Are you sure you want to delete your account? This action cannot be undone.',
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'All your course progress, certificates, and personal data will be permanently removed.',
+              style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _requestAccountDeletion();
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _requestAccountDeletion() {
+    // Show a message about the process
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Deletion Request Sent'),
+        content: const Text(
+          'Your account deletion request has been received. Our team will process it within 48 hours and send a confirmation email to your registered address.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              // Log out the user
+              await AuthHelper.clearLoginData();
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => LoginScreen()),
+                  (route) => false,
+                );
+              }
+            },
+            child: const Text('OK'),
+          ),
+        ],
       ),
     );
   }

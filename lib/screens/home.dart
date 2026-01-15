@@ -1,4 +1,8 @@
 import 'dart:math' as math;
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -15,6 +19,7 @@ import '../providers/testimonials_provider.dart';
 import '../data/course_catalog.dart';
 import '../data/course_stream.dart';
 import '../data/joined_courses.dart';
+import '../widgets/shimmer_loading.dart';
 import '../data/auth_helper.dart';
 import '../utils/course_utils.dart';
 import '../utils/image_utils.dart';
@@ -152,7 +157,7 @@ class _HomeShellState extends State<HomeShell> {
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                      colors: [AppColors.primary, AppColors.primaryLight],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -163,7 +168,7 @@ class _HomeShellState extends State<HomeShell> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF582DB0).withOpacity(0.2),
+                        color: AppColors.primary.withOpacity(0.2),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -183,7 +188,7 @@ class _HomeShellState extends State<HomeShell> {
                           backgroundImage: ImageUtils.getProfileImageProvider(_currentStudent.profileImagePath),
                           child: ImageUtils.hasProfileImage(_currentStudent.profileImagePath)
                               ? null
-                              : const Icon(Icons.person, size: 40, color: Color(0xFF582DB0)),
+                              : const Icon(Icons.person, size: 40, color: AppColors.primary),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -264,8 +269,8 @@ class _HomeShellState extends State<HomeShell> {
                         );
                       },
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFFEF4444), width: 2),
-                        foregroundColor: const Color(0xFFEF4444),
+                        side: BorderSide(color: AppColors.error, width: 2),
+                        foregroundColor: AppColors.error,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -294,14 +299,14 @@ class _HomeShellState extends State<HomeShell> {
                         height: 64,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                            colors: [AppColors.primary, AppColors.primaryLight],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF582DB0).withOpacity(0.3),
+                              color: AppColors.primary.withOpacity(0.3),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
@@ -320,7 +325,7 @@ class _HomeShellState extends State<HomeShell> {
                           Text(
                             'NATD',
                             style: TextStyle(
-                              color: const Color(0xFF1E293B),
+                              color: AppColors.textPrimary,
                               fontWeight: FontWeight.w900,
                               fontSize: 16,
                               letterSpacing: 0.5,
@@ -336,7 +341,7 @@ class _HomeShellState extends State<HomeShell> {
                                   width: 6,
                                   height: 2,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFA1C95C),
+                                    color: AppColors.accent,
                                     borderRadius: BorderRadius.circular(1),
                                   ),
                                 ),
@@ -345,7 +350,7 @@ class _HomeShellState extends State<HomeShell> {
                                   width: 8,
                                   height: 2,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFA1C95C),
+                                    color: AppColors.accent,
                                     borderRadius: BorderRadius.circular(1),
                                   ),
                                 ),
@@ -354,7 +359,7 @@ class _HomeShellState extends State<HomeShell> {
                                   width: 6,
                                   height: 2,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFA1C95C),
+                                    color: AppColors.accent,
                                     borderRadius: BorderRadius.circular(1),
                                   ),
                                 ),
@@ -364,7 +369,7 @@ class _HomeShellState extends State<HomeShell> {
                           Text(
                             'MY',
                             style: TextStyle(
-                              color: const Color(0xFF1E293B),
+                              color: AppColors.textPrimary,
                               fontWeight: FontWeight.w900,
                               fontSize: 16,
                               letterSpacing: 0.5,
@@ -376,7 +381,7 @@ class _HomeShellState extends State<HomeShell> {
                       Text(
                         'Any Time Any Where',
                         style: TextStyle(
-                          color: Colors.grey[600],
+                          color: AppColors.textSecondary,
                           fontSize: 10,
                           fontWeight: FontWeight.w500,
                           letterSpacing: 0.5,
@@ -397,20 +402,22 @@ class _HomeShellState extends State<HomeShell> {
       bottomNavigationBar: kIsWeb ? null : Builder(
         builder: (context) {
           final width = MediaQuery.of(context).size.width;
-          final isSmallScreen = width < 360; // iPhone SE
-          final isMediumScreen = width >= 360 && width < 400; // iPhone 6/7/8, X/11/12/13
+          final isSmallScreen = width < 360.w; // Responsive check
           
-          // Responsive values - bigger content with better edge spacing
-          final horizontalMargin = isSmallScreen ? 16.0 : 20.0; // Increased from screen edges
-          final bottomMargin = isSmallScreen ? 10.0 : 12.0; // Better bottom spacing
-          final borderRadius = isSmallScreen ? 18.0 : 20.0;
-          final containerPaddingH = isSmallScreen ? 10.0 : 14.0; // Better internal spacing
-          final containerPaddingV = isSmallScreen ? 6.0 : 8.0; // Better vertical spacing
-          final navPaddingH = isSmallScreen ? 10.0 : 14.0;
-          final navPaddingV = isSmallScreen ? 10.0 : 12.0;
-          final gap = isSmallScreen ? 6.0 : 8.0;
-          final iconSize = isSmallScreen ? 24.0 : 26.0; // Bigger icons
-          final textSize = isSmallScreen ? 13.0 : 14.0; // Bigger text
+          // Responsive values - using flutter_screenutil where appropriate
+          final horizontalMargin = AppSpacing.lg.w; 
+          final bottomMargin = AppSpacing.md.h;
+          final borderRadius = 20.r;
+          final containerPaddingH = AppSpacing.md.w;
+          final containerPaddingV = AppSpacing.sm.h;
+          final navPaddingH = AppSpacing.md.w;
+          final navPaddingV = AppSpacing.md.h;
+          final gap = AppSpacing.sm.w;
+          
+          // Check if keyboard is open
+          if (MediaQuery.of(context).viewInsets.bottom > 0) {
+            return const SizedBox.shrink();
+          }
           
           return Container(
             margin: EdgeInsets.only(
@@ -419,7 +426,7 @@ class _HomeShellState extends State<HomeShell> {
               bottom: bottomMargin,
             ),
             decoration: BoxDecoration(
-              color: const Color(0xFF582DB0),
+              color: AppColors.primary,
               borderRadius: BorderRadius.circular(borderRadius),
               boxShadow: [
                 BoxShadow(
@@ -432,32 +439,27 @@ class _HomeShellState extends State<HomeShell> {
             child: SafeArea(
               top: false,
               child: Padding(
-                padding: EdgeInsets.only(
-                  left: containerPaddingH,
-                  right: containerPaddingH,
-                  top: containerPaddingV,
-                  bottom: containerPaddingV * 0.5, // Smaller bottom padding
+                padding: EdgeInsets.symmetric(
+                  horizontal: containerPaddingH,
+                  vertical: containerPaddingV,
                 ),
                 child: GNav(
                   backgroundColor: Colors.transparent,
                   color: Colors.white, // White for unselected text and icons
-                  activeColor: const Color(0xFFA1C95C), // Green for selected text and icons
-                  tabBackgroundColor: const Color(0xFFA1C95C).withOpacity(0.2),
+                  activeColor: AppColors.accent, // Green/Accent for selected text and icons
+                  tabBackgroundColor: AppColors.accent.withOpacity(0.2),
                   gap: gap,
-                  padding: EdgeInsets.only(
-                    left: navPaddingH,
-                    right: navPaddingH,
-                    top: navPaddingV,
-                    bottom: navPaddingV * 0.6, // Smaller bottom padding
+                  padding: EdgeInsets.symmetric(
+                    horizontal: navPaddingH,
+                    vertical: navPaddingV,
                   ),
                   curve: Curves.easeInOut,
                   tabs: [
                     GButton(
                       icon: Icons.home_outlined,
                       text: 'Home',
-                      iconSize: iconSize,
-                      textStyle: TextStyle(
-                        fontSize: textSize,
+                      iconSize: 24.r,
+                      textStyle: AppTextStyles.body2.copyWith(
                         fontWeight: FontWeight.w600,
                         color: Colors.white, // Unselected text color
                       ),
@@ -465,9 +467,8 @@ class _HomeShellState extends State<HomeShell> {
                     GButton(
                       icon: Icons.menu_book_outlined,
                       text: 'My Courses',
-                      iconSize: iconSize,
-                      textStyle: TextStyle(
-                        fontSize: textSize,
+                      iconSize: 24.r,
+                      textStyle: AppTextStyles.body2.copyWith(
                         fontWeight: FontWeight.w600,
                         color: Colors.white, // Unselected text color
                       ),
@@ -475,9 +476,8 @@ class _HomeShellState extends State<HomeShell> {
                     GButton(
                       icon: Icons.person_outline,
                       text: 'Profile',
-                      iconSize: iconSize,
-                      textStyle: TextStyle(
-                        fontSize: textSize,
+                      iconSize: 24.r,
+                      textStyle: AppTextStyles.body2.copyWith(
                         fontWeight: FontWeight.w600,
                         color: Colors.white, // Unselected text color
                       ),
@@ -505,16 +505,16 @@ class _HomeShellState extends State<HomeShell> {
       cursor: SystemMouseCursors.click,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        margin: EdgeInsets.symmetric(horizontal: 16.w),
+        padding: EdgeInsets.symmetric(vertical: 14.h, horizontal: 16.w),
         decoration: BoxDecoration(
           color: isSelected 
-              ? const Color(0xFF582DB0).withOpacity(0.1) 
+              ? AppColors.primary.withOpacity(0.1) 
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(16.r),
           border: isSelected
               ? Border.all(
-                  color: const Color(0xFF582DB0).withOpacity(0.3),
+                  color: AppColors.primary.withOpacity(0.3),
                   width: 1,
                 )
               : null,
@@ -526,31 +526,31 @@ class _HomeShellState extends State<HomeShell> {
             }
             setState(() => _currentIndex = index);
           },
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(16.r),
           child: Row(
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(8.r),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF582DB0).withOpacity(0.15)
+                      ? AppColors.primary.withOpacity(0.15)
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(10.r),
                 ),
                 child: Icon(
                   icon,
-                  color: isSelected ? const Color(0xFF582DB0) : Colors.grey[600],
-                  size: 22,
+                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  size: 22.r,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12.w),
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 15,
+                style: AppTextStyles.body2.copyWith(
+                  fontSize: 15.sp,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? const Color(0xFF582DB0) : Colors.grey[700],
+                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
                   letterSpacing: 0.3,
                 ),
               ),
@@ -567,7 +567,7 @@ class _NatdemyLogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF582DB0)
+      ..color = AppColors.primary
       ..style = PaintingStyle.stroke
       ..strokeWidth = 5
       ..strokeCap = StrokeCap.round
@@ -597,7 +597,7 @@ class _NatdemyLogoPainter extends CustomPainter {
     
     // Arrow at top right (integrated into N)
     final arrowPaint = Paint()
-      ..color = const Color(0xFF582DB0)
+      ..color = AppColors.primary
       ..style = PaintingStyle.fill;
     
     final arrowPath = Path();
@@ -853,94 +853,93 @@ class _HomeTabState extends State<HomeTab> {
       builder: (sheetContext) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
             child: Container(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(24.r),
                 border: Border.all(
-                  color: const Color(0xFF582DB0),
-                  width: 2,
+                  color: AppColors.primary,
+                  width: 2.r,
                 ),
-                gradient: const LinearGradient(
+                gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Color(0xFFF5F0FF),
-                    Color(0xFFFFFFFF),
+                    AppColors.primary.withOpacity(0.05),
+                    AppColors.surface,
                   ],
                 ),
-                boxShadow: const [
+                boxShadow: [
                   BoxShadow(
-                    color: Color(0x33582DB0),
-                    blurRadius: 24,
-                    offset: Offset(0, 12),
+                    color: AppColors.primary.withOpacity(0.2),
+                    blurRadius: 24.r,
+                    offset: Offset(0, 12.h),
                   ),
                 ],
               ),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 24.h),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Center(
                       child: Container(
-                        width: 48,
-                        height: 5,
+                        width: 48.w,
+                        height: 5.h,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFBFA5ED),
-                          borderRadius: BorderRadius.circular(3),
+                          color: AppColors.primary.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(3.r),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: 20.h),
                     Row(
                       children: [
                         Container(
-                          width: 52,
-                          height: 52,
+                          width: 52.r,
+                          height: 52.r,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: const LinearGradient(
                               colors: [
-                                Color(0xFF4D23AA),
-                                Color(0xFF6435C8),
+                                AppColors.primary,
+                                AppColors.primaryLight,
                               ],
                             ),
-                            boxShadow: const [
+                            boxShadow: [
                               BoxShadow(
-                                color: Color(0x40582DB0),
-                                blurRadius: 20,
-                                offset: Offset(0, 8),
+                                color: AppColors.primary.withOpacity(0.25),
+                                blurRadius: 20.r,
+                                offset: Offset(0, 8.h),
                               ),
                             ],
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.headset_mic,
                             color: Colors.white,
-                            size: 26,
+                            size: 26.r,
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        SizedBox(width: 16.w),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
+                            children: [
                               Text(
                                 'Need help?',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF582DB0),
+                                style: AppTextStyles.headline2.copyWith(
+                                  fontSize: 20.sp,
+                                  color: AppColors.primary,
                                 ),
                               ),
-                              SizedBox(height: 6),
+                              SizedBox(height: 6.h),
                               Text(
                                 'Our team is ready on WhatsApp to answer any questions.',
-                                style: TextStyle(
-                                  fontSize: 14,
+                                style: AppTextStyles.body2.copyWith(
+                                  fontSize: 14.sp,
                                   height: 1.5,
-                                  color: Color(0xFF4C3B82),
+                                  color: AppColors.textPrimary,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -948,31 +947,30 @@ class _HomeTabState extends State<HomeTab> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close_rounded, color: Color(0xFF582DB0)),
+                          icon: Icon(Icons.close_rounded, color: AppColors.primary, size: 24.r),
                           tooltip: 'Close',
                           onPressed: () => Navigator.of(sheetContext).pop(),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 28),
+                    SizedBox(height: 28.h),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF25D366),
+                          backgroundColor: AppColors.whatsapp,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: EdgeInsets.symmetric(vertical: 16.h),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(16.r),
                           ),
                           elevation: 4,
                         ),
-                        icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 18),
-                        label: const Text(
+                        icon: FaIcon(FontAwesomeIcons.whatsapp, size: 18.r),
+                        label: Text(
                           'WhatsApp Support',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
+                          style: AppTextStyles.button.copyWith(
+                            fontSize: 14.sp,
                           ),
                         ),
                         onPressed: () async {
@@ -983,51 +981,51 @@ class _HomeTabState extends State<HomeTab> {
                         },
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24.h),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(14),
+                      padding: EdgeInsets.all(14.r),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(16.r),
                         border: Border.all(
-                          color: const Color(0xFFE0D2FF),
-                          width: 1,
+                          color: AppColors.primary.withOpacity(0.1),
+                          width: 1.r,
                         ),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: EdgeInsets.all(8.r),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEEE4FF),
-                              borderRadius: BorderRadius.circular(12),
+                              color: AppColors.primary.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(12.r),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.info_outline,
-                              color: Color(0xFF582DB0),
-                              size: 20,
+                              color: AppColors.primary,
+                              size: 20.r,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: 12.w),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
+                              children: [
                                 Text(
                                   'Service Hours',
-                                  style: TextStyle(
+                                  style: AppTextStyles.body2.copyWith(
                                     fontWeight: FontWeight.w700,
-                                    color: Color(0xFF452D8A),
+                                    color: AppColors.primary,
                                   ),
                                 ),
-                                SizedBox(height: 4),
+                                SizedBox(height: 4.h),
                                 Text(
                                   'Mon - Sat · 9:00 AM to 6:00 PM',
-                                  style: TextStyle(
-                                    color: Color(0xFF5B4A9B),
-                                    fontSize: 13,
+                                  style: AppTextStyles.caption.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 13.sp,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -1109,21 +1107,21 @@ class _HomeTabState extends State<HomeTab> {
         // App Bar
         SliverAppBar(
           pinned: true,
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.background,
           leading: kIsWeb ? null : Builder(
             builder: (context) => IconButton(
-              icon: const Icon(Icons.menu, color: Colors.black),
+              icon: Icon(Icons.menu, color: AppColors.textPrimary, size: 24.r),
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
-          elevation: kIsWeb ? 0 : 0,
+          elevation: 0,
           shadowColor: Colors.transparent,
           flexibleSpace: kIsWeb ? Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.background,
               border: Border(
                 bottom: BorderSide(
-                  color: Colors.grey[200]!,
+                  color: AppColors.divider,
                   width: 1,
                 ),
               ),
@@ -1131,11 +1129,10 @@ class _HomeTabState extends State<HomeTab> {
           ) : null,
           title: Image.asset(
             'assets/images/natdemy_logo.png',
-            height: 45,
+            height: 45.h,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) {
               debugPrint('Error loading logo image: $error');
-              // Fallback if image not found - show text version
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1144,56 +1141,54 @@ class _HomeTabState extends State<HomeTab> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       SizedBox(
-                        width: kIsWeb ? 48 : 40,
-                        height: kIsWeb ? 50 : 40,
+                        width: kIsWeb ? 48 : 40.w,
+                        height: kIsWeb ? 50 : 40.h,
                         child: CustomPaint(
                           painter: _NatdemyLogoPainter(),
                         ),
                       ),
-                      SizedBox(width: kIsWeb ? 16 : 12),
+                      SizedBox(width: kIsWeb ? 16 : 12.w),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
                             'NATD',
-                            style: TextStyle(
-                              color: const Color(0xFF1E293B),
-                              fontWeight: FontWeight.w900,
-                              fontSize: kIsWeb ? 28 : 24,
+                            style: AppTextStyles.headline1.copyWith(
+                              fontSize: kIsWeb ? 28 : 24.sp,
                               letterSpacing: 0.5,
                             ),
                           ),
                           Container(
-                            margin: EdgeInsets.symmetric(horizontal: kIsWeb ? 6 : 4),
+                            margin: EdgeInsets.symmetric(horizontal: kIsWeb ? 6 : 4.w),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Container(
-                                  width: kIsWeb ? 12 : 10,
-                                  height: kIsWeb ? 4 : 3.5,
+                                  width: kIsWeb ? 12 : 10.w,
+                                  height: kIsWeb ? 4 : 3.5.h,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFA1C95C),
-                                    borderRadius: BorderRadius.circular(1.5),
+                                    color: AppColors.accent,
+                                    borderRadius: BorderRadius.circular(1.5.r),
                                   ),
                                 ),
-                                SizedBox(height: kIsWeb ? 4 : 3),
+                                SizedBox(height: kIsWeb ? 4 : 3.h),
                                 Container(
-                                  width: kIsWeb ? 16 : 14,
-                                  height: kIsWeb ? 4 : 3.5,
+                                  width: kIsWeb ? 16 : 14.w,
+                                  height: kIsWeb ? 4 : 3.5.h,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFA1C95C),
-                                    borderRadius: BorderRadius.circular(1.5),
+                                    color: AppColors.accent,
+                                    borderRadius: BorderRadius.circular(1.5.r),
                                   ),
                                 ),
-                                SizedBox(height: kIsWeb ? 4 : 3),
+                                SizedBox(height: kIsWeb ? 4 : 3.h),
                                 Container(
-                                  width: kIsWeb ? 12 : 10,
-                                  height: kIsWeb ? 4 : 3.5,
+                                  width: kIsWeb ? 12 : 10.w,
+                                  height: kIsWeb ? 4 : 3.5.h,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFA1C95C),
-                                    borderRadius: BorderRadius.circular(1.5),
+                                    color: AppColors.accent,
+                                    borderRadius: BorderRadius.circular(1.5.r),
                                   ),
                                 ),
                               ],
@@ -1201,10 +1196,8 @@ class _HomeTabState extends State<HomeTab> {
                           ),
                           Text(
                             'MY',
-                            style: TextStyle(
-                              color: const Color(0xFF1E293B),
-                              fontWeight: FontWeight.w900,
-                              fontSize: kIsWeb ? 28 : 24,
+                            style: AppTextStyles.headline1.copyWith(
+                              fontSize: kIsWeb ? 28 : 24.sp,
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -1212,13 +1205,12 @@ class _HomeTabState extends State<HomeTab> {
                       ),
                     ],
                   ),
-                  SizedBox(height: kIsWeb ? 6 : 3),
+                  SizedBox(height: kIsWeb ? 6 : 3.h),
                   Text(
                     'Any Time Any Where',
-                    style: TextStyle(
-                      color: const Color(0xFF64748B),
-                      fontSize: kIsWeb ? 13 : 11,
-                      fontWeight: FontWeight.w500,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: kIsWeb ? 13 : 11.sp,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -1236,10 +1228,10 @@ class _HomeTabState extends State<HomeTab> {
             child: Responsive.constrainWidth(
               Padding(
                 padding: EdgeInsets.fromLTRB(
-                  kIsWeb ? Responsive.getHorizontalPadding(context) : 16,
-                  kIsWeb ? 40 : 16,
-                  kIsWeb ? Responsive.getHorizontalPadding(context) : 16,
-                  kIsWeb ? 32 : 16,
+                  kIsWeb ? Responsive.getHorizontalPadding(context) : AppSpacing.md.w,
+                  kIsWeb ? 40 : AppSpacing.md.h,
+                  kIsWeb ? Responsive.getHorizontalPadding(context) : AppSpacing.md.w,
+                  kIsWeb ? 32 : AppSpacing.md.h,
                 ),
                 child: Consumer<BannersProvider>(
                   builder: (context, bannersProvider, child) {
@@ -1274,18 +1266,17 @@ class _HomeTabState extends State<HomeTab> {
               Padding(
                 padding: EdgeInsets.fromLTRB(
                   Responsive.getHorizontalPadding(context),
-                  16,
+                  AppSpacing.md.h,
                   Responsive.getHorizontalPadding(context),
-                  8,
+                  AppSpacing.xs.h,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'POPULAR COURSES',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: kIsWeb ? 28 : null,
+                      style: AppTextStyles.headline2.copyWith(
+                        fontSize: kIsWeb ? 28 : 20.sp,
                       ),
                     ),
                     Row(
@@ -1293,13 +1284,13 @@ class _HomeTabState extends State<HomeTab> {
                         Consumer<CoursesProvider>(
                           builder: (context, coursesProvider, child) {
                             if (coursesProvider.isLoading)
-                              return const Padding(
-                                padding: EdgeInsets.all(8.0),
-                                child: ThemePulsingDotsIndicator(size: 8.0, spacing: 8.0),
+                              return Padding(
+                                padding: EdgeInsets.all(AppSpacing.xs.r),
+                                child: const ThemePulsingDotsIndicator(size: 8.0, spacing: 8.0),
                               );
                             else
                               return IconButton(
-                                icon: const Icon(Icons.refresh, size: 20),
+                                icon: Icon(Icons.refresh, size: 20.r, color: AppColors.textPrimary),
                                 onPressed: () {
                                   coursesProvider.fetchCourses(forceRefresh: true);
                                   Provider.of<BannersProvider>(context, listen: false).fetchBanners();
@@ -1320,11 +1311,8 @@ class _HomeTabState extends State<HomeTab> {
                             );
                           },
                           style: TextButton.styleFrom(
-                            foregroundColor: const Color(0xFF000000),
-                            textStyle: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
+                            foregroundColor: AppColors.textPrimary,
+                            textStyle: AppTextStyles.button.copyWith(fontSize: 14.sp),
                           ),
                           child: const Text('See All'),
                         ),
@@ -1351,35 +1339,42 @@ class _HomeTabState extends State<HomeTab> {
             final courses = allCourses.length > 4 ? allCourses.take(4).toList() : List<Course>.from(allCourses);
             
             if (coursesProvider.isLoading && courses.isEmpty)
-              return const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(
-                    child: ThemePulsingDotsIndicator(size: 12.0, spacing: 16.0),
+              return SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: Responsive.getHorizontalPadding(context)),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: Responsive.getGridColumns(context),
+                    mainAxisSpacing: Responsive.getCardSpacing(context),
+                    crossAxisSpacing: Responsive.getCardSpacing(context),
+                    childAspectRatio: kIsWeb ? 0.65 : 1.0,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => const CourseCardShimmer(),
+                    childCount: 4,
                   ),
                 ),
               );
             else if (coursesProvider.error != null && courses.isEmpty)
               return SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
                   child: Card(
                     color: Colors.orange.shade50,
                     child: Padding(
-                      padding: const EdgeInsets.all(12),
+                      padding: EdgeInsets.all(12.r),
                       child: Row(
                         children: [
-                          Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
-                          const SizedBox(width: 12),
+                          Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 24.r),
+                          SizedBox(width: 12.w),
                           Expanded(
                             child: Text(
                               coursesProvider.error!,
-                              style: TextStyle(color: Colors.orange.shade900, fontSize: 14),
+                              style: AppTextStyles.body2.copyWith(color: Colors.orange.shade900, fontSize: 14.sp),
                             ),
                           ),
                           TextButton(
                             onPressed: () => coursesProvider.fetchCourses(forceRefresh: true),
-                            child: const Text('Retry'),
+                            child: Text('Retry', style: AppTextStyles.button.copyWith(color: Colors.orange.shade900)),
                           ),
                         ],
                       ),
@@ -1390,15 +1385,15 @@ class _HomeTabState extends State<HomeTab> {
             else if (courses.isEmpty)
               return SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.all(32),
+                  padding: EdgeInsets.all(32.r),
                   child: Center(
                     child: Column(
                       children: [
-                        Icon(Icons.school_outlined, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
+                        Icon(Icons.school_outlined, size: 64.r, color: Colors.grey[400]),
+                        SizedBox(height: 16.h),
                         Text(
                           'No courses available',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                          style: AppTextStyles.body1.copyWith(color: AppColors.textSecondary, fontSize: 16.sp),
                         ),
                       ],
                     ),
@@ -1441,16 +1436,15 @@ class _HomeTabState extends State<HomeTab> {
               Padding(
                 padding: EdgeInsets.fromLTRB(
                   Responsive.getHorizontalPadding(context),
-                  32,
+                  kIsWeb ? 40 : AppSpacing.xl.h,
                   Responsive.getHorizontalPadding(context),
-                  8,
+                  AppSpacing.sm.h,
                 ),
                 child: Text(
                   'NEED ASSISTANCE?',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
-                    fontSize: kIsWeb ? 28 : null,
+                  style: AppTextStyles.headline2.copyWith(
+                    color: AppColors.textPrimary,
+                    fontSize: kIsWeb ? 28 : 20.sp,
                   ),
                 ),
               ),
@@ -1466,9 +1460,9 @@ class _HomeTabState extends State<HomeTab> {
               Padding(
               padding: EdgeInsets.fromLTRB(
                 Responsive.getHorizontalPadding(context),
-                16,
+                AppSpacing.md.h,
                 Responsive.getHorizontalPadding(context),
-                16,
+                AppSpacing.md.h,
               ),
               child: kIsWeb ? Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1483,61 +1477,59 @@ class _HomeTabState extends State<HomeTab> {
                       return Card(
                         elevation: kIsWeb ? 4 : 2,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
+                          borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20.r),
                         ),
                         child: Container(
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
+                              borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20.r),
                               gradient: const LinearGradient(
-                                colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                                colors: [AppColors.primary, AppColors.primaryLight],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
                             ),
                             child: Padding(
-                              padding: EdgeInsets.all(kIsWeb ? 32 : 24),
+                              padding: EdgeInsets.all(kIsWeb ? 32 : 24.r),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
                                       Container(
-                                        padding: EdgeInsets.all(kIsWeb ? 16 : 12),
+                                        padding: EdgeInsets.all(kIsWeb ? 16 : 12.r),
                                         decoration: BoxDecoration(
                                           color: Colors.white.withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                                          borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12.r),
                                         ),
                                         child: Icon(
                                           Icons.support_agent,
                                           color: Colors.white,
-                                          size: kIsWeb ? 28 : 24,
+                                          size: kIsWeb ? 28 : 24.r,
                                         ),
                                       ),
-                                      SizedBox(width: kIsWeb ? 16 : 12),
+                                      SizedBox(width: kIsWeb ? 16 : 12.w),
                                       Expanded(
                                         child: Text(
                                           'Get in Touch',
-                                          style: TextStyle(
+                                          style: AppTextStyles.headline2.copyWith(
                                             color: Colors.white,
-                                            fontSize: kIsWeb ? 26 : 22,
-                                            fontWeight: FontWeight.w700,
+                                            fontSize: kIsWeb ? 26 : 22.sp,
                                           ),
                                         ),
                                       ),
                                     ],
                                   ),
-                                  SizedBox(height: kIsWeb ? 20 : 16),
+                                  SizedBox(height: kIsWeb ? 20 : 16.h),
                                   Text(
                                     'Our support team is here to help you 24/7. Reach out anytime for assistance with your learning journey.',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: kIsWeb ? 16 : 14,
+                                    style: AppTextStyles.body1.copyWith(
+                                      color: Colors.white.withOpacity(0.7),
+                                      fontSize: kIsWeb ? 16 : 14.sp,
                                       height: 1.5,
-                                      fontWeight: FontWeight.w400,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
-                                  SizedBox(height: kIsWeb ? 32 : 24),
+                                  SizedBox(height: kIsWeb ? 32 : 24.h),
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
@@ -1550,26 +1542,25 @@ class _HomeTabState extends State<HomeTab> {
                                         foregroundColor: Colors.white,
                                         elevation: 0,
                                         padding: EdgeInsets.symmetric(
-                                          vertical: kIsWeb ? 20 : 16,
-                                          horizontal: kIsWeb ? 24 : 16,
+                                          vertical: kIsWeb ? 20 : 16.h,
+                                          horizontal: kIsWeb ? 24 : 16.w,
                                         ),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
-                                          side: const BorderSide(color: Color(0xFF582DB0), width: 1),
+                                          borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12.r),
+                                          side: const BorderSide(color: Colors.white24, width: 1),
                                         ),
                                       ),
                                       icon: AppAnimations.pulse(
                                         child: FaIcon(
                                           FontAwesomeIcons.whatsapp,
-                                          size: kIsWeb ? 24 : 20,
+                                          size: kIsWeb ? 24 : 20.r,
                                           color: Colors.white,
                                         ),
                                       ),
                                       label: Text(
                                         'WhatsApp Support',
-                                        style: TextStyle(
-                                          fontSize: kIsWeb ? 18 : 16,
-                                          fontWeight: FontWeight.w600,
+                                        style: AppTextStyles.button.copyWith(
+                                          fontSize: kIsWeb ? 18 : 16.sp,
                                           color: Colors.white,
                                         ),
                                       ),
@@ -1587,44 +1578,44 @@ class _HomeTabState extends State<HomeTab> {
                 SizedBox(width: kIsWeb ? 24 : 0),
         // WhatsApp Group Card
                 Expanded(
-            child: Card(
+                  child: Card(
                     elevation: kIsWeb ? 10 : 8,
-              shadowColor: Colors.black.withOpacity(0.15),
-              shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
+                    shadowColor: AppColors.shadow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16.r),
                       side: BorderSide(
-                        color: const Color(0xFF582DB0),
-                        width: kIsWeb ? 2.5 : 2,
-                ),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF25D366), Color(0xFF128C7E)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
+                        color: AppColors.primary,
+                        width: kIsWeb ? 2.5 : 2.r,
+                      ),
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16.r),
+                        gradient: const LinearGradient(
+                          colors: [AppColors.whatsapp, Color(0xFF128C7E)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
                 child: Padding(
-                        padding: EdgeInsets.all(kIsWeb ? 32 : 24),
+                  padding: EdgeInsets.all(kIsWeb ? 32 : 24.r),
                   child: Column(
                     children: [
                       Row(
                         children: [
                           Container(
-                                  padding: EdgeInsets.all(kIsWeb ? 16 : 12),
+                            padding: EdgeInsets.all(kIsWeb ? 16 : 12.r),
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                              borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12.r),
                             ),
-                                  child: AppAnimations.pulse(
-                                    child: FaIcon(
-                                      FontAwesomeIcons.whatsapp,
-                                      color: Colors.white,
-                                      size: kIsWeb ? 32 : 28,
-                                    ),
-                                  ),
+                            child: AppAnimations.pulse(
+                              child: FaIcon(
+                                FontAwesomeIcons.whatsapp,
+                                color: Colors.white,
+                                size: kIsWeb ? 32 : 28.r,
+                              ),
+                            ),
                           ),
                                 SizedBox(width: kIsWeb ? 20 : 16),
                                 Expanded(
@@ -1717,92 +1708,90 @@ class _HomeTabState extends State<HomeTab> {
 
                     return Card(
                       elevation: kIsWeb ? 4 : 2,
+                      shadowColor: AppColors.shadow,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
+                        borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20.r),
                       ),
                       child: Container(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20),
+                          borderRadius: BorderRadius.circular(kIsWeb ? 24 : 20.r),
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                            colors: [AppColors.primary, AppColors.primaryLight],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                         ),
                         child: Padding(
-                            padding: EdgeInsets.all(kIsWeb ? 32 : 24),
+                            padding: EdgeInsets.all(kIsWeb ? 32 : 24.r),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   children: [
                                     Container(
-                                      padding: EdgeInsets.all(kIsWeb ? 16 : 12),
+                                      padding: EdgeInsets.all(kIsWeb ? 16 : 12.r),
                                       decoration: BoxDecoration(
                                         color: Colors.white.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                                        borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12.r),
                                       ),
                                       child: Icon(
                                         Icons.support_agent,
                                         color: Colors.white,
-                                        size: kIsWeb ? 28 : 24,
+                                        size: kIsWeb ? 28 : 24.r,
                                       ),
                                     ),
-                                    SizedBox(width: kIsWeb ? 16 : 12),
+                                    SizedBox(width: kIsWeb ? 16 : 12.w),
                                     Expanded(
                                       child: Text(
                                         'Get in Touch',
-                                        style: TextStyle(
+                                        style: AppTextStyles.headline2.copyWith(
                                           color: Colors.white,
-                                          fontSize: kIsWeb ? 26 : 22,
-                                          fontWeight: FontWeight.w700,
+                                          fontSize: kIsWeb ? 26 : 22.sp,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                SizedBox(height: kIsWeb ? 20 : 16),
+                                SizedBox(height: kIsWeb ? 20 : 16.h),
                                 Text(
                                   'Our support team is here to help you 24/7. Reach out anytime for assistance with your learning journey.',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: kIsWeb ? 16 : 14,
+                                  style: AppTextStyles.body2.copyWith(
+                                    color: Colors.white.withOpacity(0.7),
+                                    fontSize: kIsWeb ? 16 : 14.sp,
                                     height: 1.5,
-                                    fontWeight: FontWeight.w400,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
-                                SizedBox(height: kIsWeb ? 32 : 24),
+                                SizedBox(height: kIsWeb ? 32 : 24.h),
                                 SizedBox(
                                   width: double.infinity,
-                                  child: ElevatedButton.icon(
+                                  child: FilledButton.icon(
                                     onPressed: () async {
                                       if (!context.mounted) return;
                                       await _showContactDialog(context);
                                     },
-                                    style: ElevatedButton.styleFrom(
+                                    style: FilledButton.styleFrom(
                                       backgroundColor: Colors.white.withOpacity(0.2),
                                       foregroundColor: Colors.white,
                                       elevation: 0,
                                       padding: EdgeInsets.symmetric(
-                                        vertical: kIsWeb ? 20 : 16,
-                                        horizontal: kIsWeb ? 24 : 16,
+                                        vertical: kIsWeb ? 20 : 16.h,
+                                        horizontal: kIsWeb ? 24 : 16.w,
                                       ),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
-                                        side: const BorderSide(color: Color(0xFF582DB0), width: 1),
+                                        borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12.r),
+                                        side: const BorderSide(color: Colors.white24, width: 1),
                                       ),
                                     ),
                                     icon: FaIcon(
                                       FontAwesomeIcons.whatsapp,
-                                      size: kIsWeb ? 24 : 20,
+                                      size: kIsWeb ? 24 : 20.r,
                                       color: Colors.white,
                                     ),
                                     label: Text(
                                       'WhatsApp Support',
-                                      style: TextStyle(
-                                        fontSize: kIsWeb ? 18 : 16,
-                                        fontWeight: FontWeight.w600,
+                                      style: AppTextStyles.button.copyWith(
+                                        fontSize: kIsWeb ? 18 : 16.sp,
                                         color: Colors.white,
                                       ),
                                     ),
@@ -1819,61 +1808,61 @@ class _HomeTabState extends State<HomeTab> {
                 // WhatsApp Group Card
                 Card(
                   elevation: kIsWeb ? 10 : 8,
-                  shadowColor: Colors.black.withOpacity(0.15),
+                  shadowColor: AppColors.shadow,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
+                    borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16.r),
                     side: BorderSide(
-                      color: const Color(0xFF582DB0),
-                      width: kIsWeb ? 2.5 : 2,
+                      color: AppColors.primary,
+                      width: kIsWeb ? 2.5 : 2.r,
                     ),
                   ),
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
+                      borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16.r),
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF25D366), Color(0xFF128C7E)],
+                        colors: [AppColors.whatsapp, Color(0xFF128C7E)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                     ),
                     child: Padding(
-                      padding: EdgeInsets.all(kIsWeb ? 32 : 24),
+                      padding: EdgeInsets.all(kIsWeb ? 32 : 24.r),
                       child: Column(
                         children: [
                           Row(
                             children: [
                               Container(
-                                padding: EdgeInsets.all(kIsWeb ? 16 : 12),
+                                padding: EdgeInsets.all(kIsWeb ? 16 : 12.r),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                                  borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12.r),
                                 ),
-                                child: FaIcon(
-                                  FontAwesomeIcons.whatsapp,
-                                  color: Colors.white,
-                                  size: kIsWeb ? 32 : 28,
+                                child: AppAnimations.pulse(
+                                  child: FaIcon(
+                                    FontAwesomeIcons.whatsapp,
+                                    color: Colors.white,
+                                    size: kIsWeb ? 32 : 28.r,
+                                  ),
                                 ),
                               ),
-                              SizedBox(width: kIsWeb ? 20 : 16),
+                              SizedBox(width: kIsWeb ? 20 : 16.w),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       'Join Our Community',
-                                      style: TextStyle(
-                                        color: Colors.black,
-                                        fontSize: kIsWeb ? 26 : 22,
-                                        fontWeight: FontWeight.w700,
+                                      style: AppTextStyles.headline2.copyWith(
+                                        color: Colors.white,
+                                        fontSize: kIsWeb ? 26 : 22.sp,
                                       ),
                                     ),
-                                    SizedBox(height: kIsWeb ? 6 : 4),
+                                    SizedBox(height: kIsWeb ? 6 : 4.h),
                                     Text(
                                       'Connect with fellow learners',
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: kIsWeb ? 16 : 14,
-                                        fontWeight: FontWeight.w400,
+                                      style: AppTextStyles.body2.copyWith(
+                                        color: Colors.white.withOpacity(0.7),
+                                        fontSize: kIsWeb ? 16 : 14.sp,
                                       ),
                                     ),
                                   ],
@@ -1881,18 +1870,17 @@ class _HomeTabState extends State<HomeTab> {
                               ),
                             ],
                           ),
-                          SizedBox(height: kIsWeb ? 24 : 20),
+                          SizedBox(height: kIsWeb ? 24 : 20.h),
                           Text(
                             'Join our WhatsApp group to get updates, share knowledge, and connect with other students on their learning journey.',
-                            style: TextStyle(
+                            style: AppTextStyles.body1.copyWith(
                               color: Colors.white,
-                              fontSize: kIsWeb ? 16 : 14,
+                              fontSize: kIsWeb ? 16 : 14.sp,
                               height: 1.5,
-                              fontWeight: FontWeight.w400,
                             ),
                             textAlign: TextAlign.center,
                           ),
-                          SizedBox(height: kIsWeb ? 24 : 20),
+                          SizedBox(height: kIsWeb ? 24 : 20.h),
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton.icon(
@@ -1903,25 +1891,28 @@ class _HomeTabState extends State<HomeTab> {
                               },
                               style: FilledButton.styleFrom(
                                 backgroundColor: Colors.white,
-                                foregroundColor: const Color(0xFF25D366),
+                                foregroundColor: AppColors.whatsapp,
                                 elevation: 0,
                                 padding: EdgeInsets.symmetric(
-                                  vertical: kIsWeb ? 20 : 16,
-                                  horizontal: kIsWeb ? 24 : 16,
+                                  vertical: kIsWeb ? 20 : 16.h,
+                                  horizontal: kIsWeb ? 24 : 16.w,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12),
+                                  borderRadius: BorderRadius.circular(kIsWeb ? 16 : 12.r),
                                 ),
                               ),
-                              icon: FaIcon(
-                                FontAwesomeIcons.whatsapp,
-                                size: kIsWeb ? 24 : 20,
+                              icon: AppAnimations.pulse(
+                                child: FaIcon(
+                                  FontAwesomeIcons.whatsapp,
+                                  size: kIsWeb ? 24 : 20.r,
+                                ),
                               ),
                               label: Text(
                                 'Join WhatsApp Group',
-                                style: TextStyle(
-                                  fontSize: kIsWeb ? 18 : 16,
+                                style: AppTextStyles.button.copyWith(
+                                  fontSize: kIsWeb ? 18 : 16.sp,
                                   fontWeight: FontWeight.w700,
+                                  color: AppColors.whatsapp,
                                 ),
                               ),
                             ),
@@ -1962,11 +1953,11 @@ class _HomeTabState extends State<HomeTab> {
                             height: kIsWeb ? 36 : 32,
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                                colors: [AppColors.primary, AppColors.primaryLight],
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
                               ),
-                              borderRadius: BorderRadius.circular(3),
+                              borderRadius: BorderRadius.circular(3.r),
                               boxShadow: [
                                 BoxShadow(
                                   color: const Color(0xFF582DB0).withOpacity(0.3),
@@ -1983,10 +1974,9 @@ class _HomeTabState extends State<HomeTab> {
                               children: [
                                 Text(
                                   'STUDENT TESTIMONIALS',
-                                  style: TextStyle(
-                                    fontSize: kIsWeb ? 24 : 20,
-                                    fontWeight: FontWeight.w900,
-                                    color: const Color(0xFF1E293B),
+                                  style: AppTextStyles.headline2.copyWith(
+                                    fontSize: kIsWeb ? 24 : 20.sp,
+                                    color: AppColors.textPrimary,
                                     letterSpacing: 1.2,
                                   ),
                                 ),
@@ -1996,7 +1986,7 @@ class _HomeTabState extends State<HomeTab> {
                                   height: 3,
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
-                                      colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                                      colors: [AppColors.primary, AppColors.primaryLight],
                                     ),
                                     borderRadius: BorderRadius.circular(2),
                                   ),
@@ -2013,10 +2003,14 @@ class _HomeTabState extends State<HomeTab> {
                     Consumer<TestimonialsProvider>(
                       builder: (context, testimonialsProvider, child) {
                         if (testimonialsProvider.isLoading)
-                          return const Padding(
-                            padding: EdgeInsets.all(32),
+                          return Padding(
+                            padding: EdgeInsets.all(32.r),
                             child: Center(
-                              child: ThemePulsingDotsIndicator(size: 12.0, spacing: 16.0),
+                              child: ShimmerLoading(
+                                width: kIsWeb ? 700 : double.infinity,
+                                height: 200.h,
+                                borderRadius: 20.r,
+                              ),
                             ),
                           );
                         else if (testimonialsProvider.testimonials.isEmpty)
@@ -2179,34 +2173,34 @@ class _NeatTestimonialCard extends StatelessWidget {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(isWeb ? 24 : 20),
+        borderRadius: BorderRadius.circular(isWeb ? 24 : 20.r),
         side: BorderSide(
-          color: const Color(0xFF582DB0).withOpacity(0.2),
-          width: 1.5,
+          color: AppColors.primary.withOpacity(0.2),
+          width: 1.5.r,
         ),
       ),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(isWeb ? 24 : 20),
+          borderRadius: BorderRadius.circular(isWeb ? 24 : 20.r),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Colors.white,
-              const Color(0xFFF8F5FF).withOpacity(0.5),
+              AppColors.surface,
+              AppColors.primary.withOpacity(0.05),
             ],
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF582DB0).withOpacity(0.08),
-              blurRadius: isWeb ? 20 : 16,
+              color: AppColors.primary.withOpacity(0.08),
+              blurRadius: isWeb ? 20 : 16.r,
               spreadRadius: 0,
-              offset: const Offset(0, 8),
+              offset: Offset(0, 8.h),
             ),
           ],
         ),
         child: Padding(
-          padding: EdgeInsets.all(isWeb ? 28 : 20),
+          padding: EdgeInsets.all(isWeb ? 28 : 20.r),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -2217,45 +2211,45 @@ class _NeatTestimonialCard extends StatelessWidget {
                 children: [
                   // Decorative quote icon
                   Container(
-                    padding: EdgeInsets.all(isWeb ? 10 : 8),
+                    padding: EdgeInsets.all(isWeb ? 10 : 8.r),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                        colors: [AppColors.primary, AppColors.primaryLight],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(isWeb ? 14 : 12),
+                      borderRadius: BorderRadius.circular(isWeb ? 14 : 12.r),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF582DB0).withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
+                          color: AppColors.primary.withOpacity(0.3),
+                          blurRadius: 8.r,
+                          offset: Offset(0, 4.h),
                         ),
                       ],
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.format_quote,
                       color: Colors.white,
-                      size: 24,
+                      size: 24.r,
                     ),
                   ),
                   const Spacer(),
                   // Rating stars
                   RatingStars(
                     rating: testimonial.rating.toDouble(),
-                    starSize: isWeb ? 16 : 14,
+                    starSize: (isWeb ? 16 : 14).r,
                     showValue: false,
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 20.h),
               // Testimonial content
               Expanded(
                 child: Text(
                   testimonial.content.trim(),
-                  style: TextStyle(
-                    fontSize: isWeb ? 15.5 : 14,
-                    color: const Color(0xFF1E293B),
+                  style: AppTextStyles.body2.copyWith(
+                    fontSize: isWeb ? 15.5 : 14.sp,
+                    color: AppColors.textPrimary,
                     height: 1.6,
                     fontWeight: FontWeight.w400,
                     letterSpacing: 0.1,
@@ -2264,21 +2258,21 @@ class _NeatTestimonialCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 20.h),
               // Divider
               Container(
-                height: 1,
+                height: 1.h,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
                       Colors.transparent,
-                      const Color(0xFF582DB0).withOpacity(0.2),
+                      AppColors.primary.withOpacity(0.2),
                       Colors.transparent,
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16.h),
               // Author info
               Row(
                 children: [
@@ -2287,20 +2281,20 @@ class _NeatTestimonialCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: const Color(0xFF582DB0),
-                        width: 2.5,
+                        color: AppColors.primary,
+                        width: 2.5.r,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF582DB0).withOpacity(0.2),
-                          blurRadius: 8,
-                          spreadRadius: 1,
+                          color: AppColors.primary.withOpacity(0.2),
+                          blurRadius: 8.r,
+                          spreadRadius: 1.r,
                         ),
                       ],
                     ),
                     child: CircleAvatar(
-                      radius: isWeb ? 24 : 20,
-                      backgroundColor: const Color(0xFF582DB0),
+                      radius: (isWeb ? 24 : 20).r,
+                      backgroundColor: AppColors.primary,
                       backgroundImage: testimonial.imageUrl != null &&
                               testimonial.imageUrl!.isNotEmpty
                           ? CachedNetworkImageProvider(testimonial.imageUrl!)
@@ -2311,16 +2305,16 @@ class _NeatTestimonialCard extends StatelessWidget {
                               testimonial.name.isNotEmpty
                                   ? testimonial.name[0].toUpperCase()
                                   : '?',
-                              style: TextStyle(
+                              style: AppTextStyles.headline1.copyWith(
                                 color: Colors.white,
-                                fontSize: isWeb ? 18 : 16,
-                                fontWeight: FontWeight.bold,
+                                fontSize: (isWeb ? 18 : 16).sp,
+                                fontWeight: FontWeight.w800,
                               ),
                             )
                           : null,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12.w),
                   // Name and department
                   Expanded(
                     child: Column(
@@ -2328,23 +2322,23 @@ class _NeatTestimonialCard extends StatelessWidget {
                       children: [
                         Text(
                           testimonial.name,
-                          style: TextStyle(
-                            fontSize: isWeb ? 16 : 14,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1E293B),
-                            letterSpacing: 0.2,
+                          style: AppTextStyles.body1.copyWith(
+                            fontSize: (isWeb ? 16 : 14).sp,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                            letterSpacing: 0.2.w,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         if (testimonial.department != null &&
                             testimonial.department!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
+                          SizedBox(height: 4.h),
                           Text(
                             testimonial.department!,
-                            style: TextStyle(
-                              fontSize: isWeb ? 13 : 12,
-                              color: Colors.grey[600],
+                            style: AppTextStyles.caption.copyWith(
+                              fontSize: (isWeb ? 13 : 12).sp,
+                              color: AppColors.textSecondary,
                               fontWeight: FontWeight.w500,
                             ),
                             maxLines: 1,
@@ -2370,13 +2364,14 @@ class _CourseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isWeb = kIsWeb;
     return Card(
       elevation: kIsWeb ? 6 : 4,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
+        borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16.r),
         side: BorderSide(
-          color: const Color(0xFF582DB0),
-          width: kIsWeb ? 2.5 : 2,
+          color: AppColors.primary,
+          width: kIsWeb ? 2.5 : 2.r,
         ),
       ),
       child: InkWell(
@@ -2389,69 +2384,69 @@ class _CourseCard extends StatelessWidget {
             ),
           );
         },
-        borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
+        borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16.r),
         child: MouseRegion(
           cursor: kIsWeb ? SystemMouseCursors.click : MouseCursor.defer,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            padding: EdgeInsets.all(kIsWeb ? 24 : 12),
-          decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16),
-            color: Colors.white,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              course.thumbnailUrl != null && course.thumbnailUrl!.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(kIsWeb ? 14 : 10),
-                      child: CachedNetworkImage(
-                        imageUrl: CourseService.getFullImageUrl(course.thumbnailUrl),
-                        width: kIsWeb ? 96 : 68,
-                        height: kIsWeb ? 96 : 68,
-                        fit: BoxFit.cover,
-                        errorWidget: (context, url, error) {
-                          return Icon(
-                            CourseUtils.getCourseIcon(course.title),
-                            color: const Color(0xFFA1C95C),
-                            size: kIsWeb ? 76 : 54,
-                          );
-                        },
-                        memCacheWidth: kIsWeb ? 192 : 136,
-                        memCacheHeight: kIsWeb ? 192 : 136,
+            padding: EdgeInsets.all(kIsWeb ? 24 : 12.r),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(kIsWeb ? 20 : 16.r),
+              color: AppColors.surface,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                course.thumbnailUrl != null && course.thumbnailUrl!.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(kIsWeb ? 14 : 10.r),
+                        child: CachedNetworkImage(
+                          imageUrl: CourseService.getFullImageUrl(course.thumbnailUrl),
+                          width: kIsWeb ? 96 : 68.w,
+                          height: kIsWeb ? 96 : 68.h,
+                          fit: BoxFit.cover,
+                          errorWidget: (context, url, error) {
+                            return Icon(
+                              CourseUtils.getCourseIcon(course.title),
+                              color: AppColors.accent,
+                              size: kIsWeb ? 76 : 54.r,
+                            );
+                          },
+                          memCacheWidth: (kIsWeb ? 192 : 136 * (ScreenUtil().pixelRatio ?? 1.0)).toInt(),
+                          memCacheHeight: (kIsWeb ? 192 : 136 * (ScreenUtil().pixelRatio ?? 1.0)).toInt(),
+                        ),
+                      )
+                    : Icon(
+                        CourseUtils.getCourseIcon(course.title),
+                        color: AppColors.accent,
+                        size: kIsWeb ? 76 : 54.r,
                       ),
-                    )
-                  : Icon(
-                      CourseUtils.getCourseIcon(course.title),
-                      color: const Color(0xFFA1C95C),
-                      size: kIsWeb ? 76 : 54,
+                SizedBox(height: kIsWeb ? 14 : 10.h),
+                Flexible(
+                  child: Text(
+                    course.title,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.body1.copyWith(
+                      fontSize: (isWeb ? 18 : 15).sp,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
                     ),
-              SizedBox(height: kIsWeb ? 14 : 10),
-              Flexible(
-                child: Text(
-                  course.title,
-                  textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: kIsWeb ? 18 : 15,
-                    fontWeight: FontWeight.bold,
-                      color: const Color(0xFF000000),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-                SizedBox(height: kIsWeb ? 8 : 6),
-              RatingStars(
-                rating: course.rating,
-                  textStyle: TextStyle(
-                    color: const Color(0xFF000000),
-                    fontSize: kIsWeb ? 14 : 12,
-                  fontWeight: FontWeight.w600,
+                SizedBox(height: kIsWeb ? 8 : 6.h),
+                RatingStars(
+                  rating: course.rating,
+                  textStyle: AppTextStyles.caption.copyWith(
+                    color: AppColors.textPrimary,
+                    fontSize: kIsWeb ? 14 : 12.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
+              ],
             ),
           ),
         ),
@@ -2480,12 +2475,12 @@ class _ContactItem extends StatelessWidget {
     return AppAnimations.scaleIn(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12.r),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(16.r),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12.r),
             border: Border.all(
               color: Colors.white.withOpacity(0.2),
               width: 1,
@@ -2494,41 +2489,41 @@ class _ContactItem extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: EdgeInsets.all(10.r),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(10.r),
                 ),
-                child: Icon(icon, color: Colors.white, size: 20),
+                child: Icon(icon, color: Colors.white, size: 20.r),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: 16.w),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: AppTextStyles.body1.copyWith(
                         color: Colors.white,
-                        fontSize: 16,
+                        fontSize: 16.sp,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4.h),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
+                      style: AppTextStyles.caption.copyWith(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 14.sp,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right,
-                color: Colors.white70,
-                size: 20,
+                color: Colors.white.withOpacity(0.7),
+                size: 20.r,
               ),
             ],
           ),
@@ -2721,21 +2716,20 @@ class _ProfileTabState extends State<ProfileTab> {
         },
       ),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.black),
+            icon: Icon(Icons.menu, color: AppColors.textPrimary, size: 24.r),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        title: const Text(
+        title: Text(
           'PROFILE',
-          style: TextStyle(
-            color: Color(0xFF582DB0),
-            fontWeight: FontWeight.w900,
-            fontSize: 20,
+          style: AppTextStyles.headline1.copyWith(
+            color: AppColors.primary,
+            fontSize: 20.sp,
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -2748,20 +2742,20 @@ class _ProfileTabState extends State<ProfileTab> {
           children: [
             // Profile Header Card
             Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(24),
+              margin: EdgeInsets.all(16.r),
+              padding: EdgeInsets.all(24.r),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF582DB0), Color(0xFF8B5CF6)],
+                  colors: [AppColors.primary, AppColors.primaryLight],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(20.r),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF582DB0).withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+                    color: AppColors.primary.withOpacity(0.3),
+                    blurRadius: 12.r,
+                    offset: Offset(0, 4.h),
                   ),
                 ],
               ),
@@ -2770,15 +2764,15 @@ class _ProfileTabState extends State<ProfileTab> {
                   Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
+                      border: Border.all(color: Colors.white, width: 3.r),
                     ),
                     child: CircleAvatar(
-                      radius: 40,
+                      radius: 40.r,
                       backgroundColor: Colors.white,
                       backgroundImage: ImageUtils.getProfileImageProvider(student.profileImagePath),
                       child: ImageUtils.hasProfileImage(student.profileImagePath)
                           ? null
-                          : const Icon(Icons.person, size: 40, color: Color(0xFF582DB0)),
+                          : Icon(Icons.person, size: 40.r, color: AppColors.primary),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -2788,35 +2782,34 @@ class _ProfileTabState extends State<ProfileTab> {
                       children: [
                         Text(
                           student.name.isEmpty ? 'Student' : student.name,
-                          style: const TextStyle(
+                          style: AppTextStyles.headline2.copyWith(
                             color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 22.sp,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: 4.h),
                         Text(
                           student.email,
-                          style: const TextStyle(
+                          style: AppTextStyles.body2.copyWith(
                             color: Colors.white70,
-                            fontSize: 16,
+                            fontSize: 16.sp,
                           ),
                         ),
                         if (student.phone.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.phone_outlined,
-                                size: 16,
+                                size: 16.r,
                                 color: Colors.white70,
                               ),
-                              const SizedBox(width: 4),
+                              SizedBox(width: 4.w),
                               Text(
                                 student.phone,
-                                style: const TextStyle(
+                                style: AppTextStyles.caption.copyWith(
                                   color: Colors.white70,
-                                  fontSize: 14,
+                                  fontSize: 14.sp,
                                 ),
                               ),
                             ],
@@ -2833,20 +2826,20 @@ class _ProfileTabState extends State<ProfileTab> {
 
             // Assigned Streams Card
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(20),
+              margin: EdgeInsets.symmetric(horizontal: 16.w),
+              padding: EdgeInsets.all(20.r),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16.r),
                 border: Border.all(
-                  color: const Color(0xFF582DB0).withOpacity(0.2),
+                  color: AppColors.primary.withOpacity(0.2),
                   width: 1,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    color: AppColors.shadow,
+                    blurRadius: 8.r,
+                    offset: Offset(0, 2.h),
                   ),
                 ],
               ),
@@ -2856,24 +2849,23 @@ class _ProfileTabState extends State<ProfileTab> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: EdgeInsets.all(8.r),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF582DB0).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8.r),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.stream,
-                          color: Color(0xFF582DB0),
-                          size: 20,
+                          color: AppColors.primary,
+                          size: 20.r,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      const Text(
+                      SizedBox(width: 12.w),
+                      Text(
                         'Assigned Streams',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1E293B),
+                        style: AppTextStyles.headline2.copyWith(
+                          fontSize: 18.sp,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ],
@@ -2889,17 +2881,17 @@ class _ProfileTabState extends State<ProfileTab> {
                   else if (_streamError != null)
                     Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: EdgeInsets.all(16.r),
                         child: Column(
                           children: [
                             Text(
                               _streamError!,
-                              style: TextStyle(color: Colors.red[600]),
+                              style: AppTextStyles.body2.copyWith(color: AppColors.error),
                             ),
-                            const SizedBox(height: 8),
+                            SizedBox(height: 8.h),
                             TextButton.icon(
                               onPressed: _loadAssignedStreams,
-                              icon: const Icon(Icons.refresh, size: 18),
+                              icon: Icon(Icons.refresh, size: 18.r),
                               label: const Text('Retry'),
                             ),
                           ],
@@ -2909,29 +2901,29 @@ class _ProfileTabState extends State<ProfileTab> {
                   else if (_assignedStreams.isEmpty)
                     Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: EdgeInsets.all(16.r),
                         child: Column(
                           children: [
                             Icon(
                               Icons.stream_outlined,
-                              size: 48,
-                              color: Colors.grey[400],
+                              size: 48.r,
+                              color: AppColors.divider,
                             ),
-                            const SizedBox(height: 12),
+                            SizedBox(height: 12.h),
                             Text(
                               'No streams assigned',
-                              style: TextStyle(
-                                fontSize: 14,
+                              style: AppTextStyles.body1.copyWith(
+                                fontSize: 14.sp,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey[600],
+                                color: AppColors.textSecondary,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            SizedBox(height: 4.h),
                             Text(
                               'Streams will appear here once assigned',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[500],
+                              style: AppTextStyles.caption.copyWith(
+                                fontSize: 12.sp,
+                                color: AppColors.textSecondary.withOpacity(0.7),
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -2941,49 +2933,49 @@ class _ProfileTabState extends State<ProfileTab> {
                     )
                   else
                     ..._assignedStreams.map((course) => Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(12),
+                          margin: EdgeInsets.only(bottom: 12.h),
+                          padding: EdgeInsets.all(12.r),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF582DB0).withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(12),
+                            color: AppColors.primary.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12.r),
                             border: Border.all(
-                              color: const Color(0xFF582DB0).withOpacity(0.1),
+                              color: AppColors.primary.withOpacity(0.1),
                               width: 1,
                             ),
                           ),
                           child: Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(8),
+                                padding: EdgeInsets.all(8.r),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF582DB0).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8.r),
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.menu_book,
-                                  color: Color(0xFF582DB0),
-                                  size: 20,
+                                  color: AppColors.primary,
+                                  size: 20.r,
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: 12.w),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       course.title,
-                                      style: const TextStyle(
-                                        fontSize: 15,
+                                      style: AppTextStyles.body1.copyWith(
+                                        fontSize: 15.sp,
                                         fontWeight: FontWeight.w600,
-                                        color: Color(0xFF1E293B),
+                                        color: AppColors.textPrimary,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
+                                    SizedBox(height: 4.h),
                                     Text(
                                       course.streamName ?? 'No stream',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.grey[700],
+                                      style: AppTextStyles.caption.copyWith(
+                                        fontSize: 13.sp,
+                                        color: AppColors.textSecondary,
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
@@ -3020,7 +3012,7 @@ class _ProfileTabState extends State<ProfileTab> {
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: const Text(
-                                    'Locked',
+                                    'LOCKED',
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
@@ -3072,7 +3064,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Notification settings coming soon!'),
-                        backgroundColor: Color(0xFF582DB0),
+                        backgroundColor: AppColors.primary,
                       ),
                     );
                   },
@@ -3115,7 +3107,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
             // Sign Out Button
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(16.r),
               child: SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -3148,15 +3140,18 @@ class _ProfileTabState extends State<ProfileTab> {
                     );
                   },
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFEF4444), width: 2),
-                    foregroundColor: const Color(0xFFEF4444),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    side: BorderSide(color: AppColors.error, width: 2.r),
+                    foregroundColor: AppColors.error,
+                    padding: EdgeInsets.symmetric(vertical: 16.h),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                   ),
-                  icon: const Icon(Icons.logout, size: 20),
-                  label: const Text(
+                  icon: Icon(Icons.logout, size: 20.r),
+                  label: Text(
                     'Sign Out',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    style: AppTextStyles.button.copyWith(
+                      fontSize: 16.sp,
+                      color: AppColors.error,
+                    ),
                   ),
                 ),
               ),
@@ -3181,24 +3176,25 @@ class _ProfileSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 12.h),
           child: Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1E293B),
-                ),
+            style: AppTextStyles.headline2.copyWith(
+              fontSize: 16.sp,
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
         Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
+          margin: EdgeInsets.symmetric(horizontal: 16.w),
           elevation: 1,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shadowColor: AppColors.shadow,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
           child: Column(
             children: children,
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16.h),
       ],
     );
   }
@@ -3221,44 +3217,44 @@ class _ProfileMenuItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(16.r),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: EdgeInsets.all(10.r),
               decoration: BoxDecoration(
-                color: const Color(0xFF582DB0).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10.r),
               ),
-              child: Icon(icon, color: const Color(0xFF582DB0), size: 20),
+              child: Icon(icon, color: AppColors.primary, size: 20.r),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: 16.w),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontSize: 16,
+                    style: AppTextStyles.body1.copyWith(
+                      fontSize: 16.sp,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E293B),
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  SizedBox(height: 2.h),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
+                    style: AppTextStyles.caption.copyWith(
+                      fontSize: 13.sp,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.grey[400], size: 20),
+            Icon(Icons.chevron_right, color: AppColors.divider, size: 20.r),
           ],
         ),
       ),

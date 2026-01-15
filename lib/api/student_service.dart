@@ -7,6 +7,7 @@ import '../data/joined_courses.dart';
 import 'api_client.dart';
 import 'course_service.dart';
 import '../utils/json_parser.dart';
+import 'home_service.dart';
 
 double? _asDouble(dynamic value) {
   if (value == null) return null;
@@ -30,36 +31,63 @@ DateTime? _parseDate(dynamic value) {
 }
 
 class StudentService {
+  static Future<List<dynamic>>? _pendingStudentsRequest;
+  static List<dynamic>? _cachedStudents;
+  static DateTime? _lastStudentsFetch;
+  static const _studentsCacheDuration = Duration(minutes: 5);
+
+  static Future<List<dynamic>> _fetchStudents() async {
+    if (_pendingStudentsRequest != null) return _pendingStudentsRequest!;
+    
+    if (_cachedStudents != null && _lastStudentsFetch != null) {
+      if (DateTime.now().difference(_lastStudentsFetch!) < _studentsCacheDuration) {
+        return _cachedStudents!;
+      }
+    }
+
+    _pendingStudentsRequest = _performStudentsFetch();
+    try {
+      final students = await _pendingStudentsRequest!;
+      _cachedStudents = students;
+      _lastStudentsFetch = DateTime.now();
+      return students;
+    } finally {
+      _pendingStudentsRequest = null;
+    }
+  }
+
+  static Future<List<dynamic>> _performStudentsFetch() async {
+    try {
+      debugPrint('📡 Fetching all students from API...');
+      final response = await ApiClient.get('/api/students/', queryParams: {'format': 'json'}, includeAuth: false);
+      if (response.statusCode == 200) {
+        return await JsonParser.parseJsonList(response.body);
+      }
+      return [];
+    } catch (e) {
+      debugPrint('❌ Error performing students fetch: $e');
+      return [];
+    }
+  }
+
   // Fetch student by email from students API
   static Future<Student?> fetchStudentByEmail(String email) async {
     try {
-      debugPrint('🔄 Fetching student data for: $email');
-      final response = await ApiClient.get('/api/students/', queryParams: {'format': 'json'}, includeAuth: false);
+      debugPrint('🔍 Looking up student by email: $email');
+      final studentsJson = await _fetchStudents();
       
-      if (response.statusCode == 200) {
-        // Parse JSON in background thread
-        final List<dynamic> studentsJson = await JsonParser.parseJsonList(response.body);
-        
-        // Find student by email (case-insensitive)
-        final normalizedEmail = email.toLowerCase().trim();
-        for (var studentJson in studentsJson) {
-          final studentData = studentJson as Map<String, dynamic>;
-          final studentEmail = studentData['email']?.toString()?.toLowerCase()?.trim();
-          if (studentEmail == normalizedEmail) {
-            debugPrint('✅ Found student: ${studentData['name']} (ID: ${studentData['id']})');
-            return _parseStudentFromJson(studentData);
-          }
+      final normalizedEmail = email.toLowerCase().trim();
+      for (var studentJson in studentsJson) {
+        final studentData = studentJson as Map<String, dynamic>;
+        final studentEmail = studentData['email']?.toString()?.toLowerCase()?.trim();
+        if (studentEmail == normalizedEmail) {
+          debugPrint('✅ Found student: ${studentData['name']} (ID: ${studentData['id']})');
+          return _parseStudentFromJson(studentData);
         }
-        
-        debugPrint('⚠️ Student not found with email: $email');
-        return null;
-      } else {
-        debugPrint('❌ Failed to fetch students: ${response.statusCode}');
-        return null;
       }
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error fetching student: $e');
-      debugPrint('   Stack trace: $stackTrace');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error in fetchStudentByEmail: $e');
       return null;
     }
   }
@@ -67,32 +95,19 @@ class StudentService {
   // Fetch student by ID from students API
   static Future<Student?> fetchStudentById(int studentId) async {
     try {
-      debugPrint('🔄 Fetching student data for ID: $studentId');
-      final response = await ApiClient.get('/api/students/', queryParams: {'format': 'json'}, includeAuth: false);
+      debugPrint('🔍 Looking up student by ID: $studentId');
+      final studentsJson = await _fetchStudents();
       
-      if (response.statusCode == 200) {
-        // Parse JSON in background thread
-        final List<dynamic> studentsJson = await JsonParser.parseJsonList(response.body);
-        
-        // Find student by ID
-        for (var studentJson in studentsJson) {
-          final studentData = studentJson as Map<String, dynamic>;
-          final id = _asDouble(studentData['id'])?.toInt();
-          if (id == studentId) {
-            debugPrint('✅ Found student by ID: ${studentData['name']} (Email: ${studentData['email']})');
-            return _parseStudentFromJson(studentData);
-          }
+      for (var studentJson in studentsJson) {
+        final studentData = studentJson as Map<String, dynamic>;
+        final id = _asDouble(studentData['id'])?.toInt();
+        if (id == studentId) {
+          return _parseStudentFromJson(studentData);
         }
-        
-        debugPrint('⚠️ Student not found with ID: $studentId');
-        return null;
-      } else {
-        debugPrint('❌ Failed to fetch students: ${response.statusCode}');
-        return null;
       }
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error fetching student by ID: $e');
-      debugPrint('   Stack trace: $stackTrace');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error in fetchStudentById: $e');
       return null;
     }
   }
@@ -100,32 +115,16 @@ class StudentService {
   // Fetch student data with course_id and stream_id
   static Future<Map<String, dynamic>?> fetchStudentDataWithCourseStream(String email) async {
     try {
-      debugPrint('🔄 Fetching student course/stream data for: $email');
-      final response = await ApiClient.get('/api/students/', queryParams: {'format': 'json'}, includeAuth: false);
-      
-      if (response.statusCode == 200) {
-        // Parse JSON in background thread
-        final List<dynamic> studentsJson = await JsonParser.parseJsonList(response.body);
-        
-        // Find student by email
-        for (var studentJson in studentsJson) {
-          final studentData = studentJson as Map<String, dynamic>;
-          if (studentData['email'] == email) {
-            debugPrint('✅ Found student data with course/stream');
-            // Return the full student data including course_id and stream_id
-            return studentData;
-          }
+      final studentsJson = await _fetchStudents();
+      for (var studentJson in studentsJson) {
+        final studentData = studentJson as Map<String, dynamic>;
+        if (studentData['email'] == email) {
+          return studentData;
         }
-        
-        debugPrint('⚠️ Student not found with email: $email');
-        return null;
-      } else {
-        debugPrint('❌ Failed to fetch student data: ${response.statusCode}');
-        return null;
       }
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error fetching student course/stream data: $e');
-      debugPrint('   Stack trace: $stackTrace');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error in fetchStudentDataWithCourseStream: $e');
       return null;
     }
   }
@@ -212,32 +211,23 @@ class StudentService {
         // Continue anyway - we can still match by email
       }
       
-      // Try home API endpoint first (has enrollments with chapters/lessons)
+      // Try home API via HomeService (deduplicated)
       try {
-        final homeResponse = await ApiClient.get(
-          '/api/home/',
-          queryParams: {'format': 'json'},
-          includeAuth: false,
-        );
-
-        if (homeResponse.statusCode == 200) {
-          // Parse JSON in background thread
-          final Map<String, dynamic> homeData = await JsonParser.parseJson(homeResponse.body);
-          final homeDataMap = homeData['data'];
-          if (homeDataMap is Map<String, dynamic>) {
-            final enrollments = homeDataMap['enrollments'];
-            if (enrollments is List && enrollments.isNotEmpty) {
-              debugPrint('✅ Found enrollments in home API');
-              return await _parseEnrollmentsFromList(
-                enrollments,
-                email,
-                studentId: targetStudentId,
-              );
-            }
+        final homeData = await HomeService.fetchHomeData();
+        if (homeData.containsKey('data') && homeData['data'] is Map) {
+          final dataMap = homeData['data'] as Map<String, dynamic>;
+          final enrollments = dataMap['enrollments'];
+          if (enrollments is List && enrollments.isNotEmpty) {
+            debugPrint('✅ Found enrollments in HomeService response');
+            return await _parseEnrollmentsFromList(
+              enrollments,
+              email,
+              studentId: targetStudentId,
+            );
           }
         }
       } catch (e) {
-        debugPrint('⚠️ Home API failed, trying enrollments endpoint: $e');
+        debugPrint('⚠️ HomeService fetch for enrollments failed: $e');
       }
       
       // Fallback to enrollments endpoint
@@ -610,8 +600,25 @@ class StudentService {
       }
     }
 
-    // Try home endpoint first (typically includes enrollments)
-    await _collectFromEndpoint('/api/home/');
+    // Try home API via HomeService (deduplicated)
+    try {
+      final homeData = await HomeService.fetchHomeData();
+      if (homeData.containsKey('data') && homeData['data'] is Map) {
+        final dataMap = homeData['data'] as Map<String, dynamic>;
+        final enrollments = dataMap['enrollments'];
+        if (enrollments is List) {
+          streamNames.addAll(
+            _collectStreamNamesFromEnrollments(
+              enrollments,
+              targetStudentId: targetStudentId,
+              targetEmail: targetEmail,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ HomeService fetch for stream names failed: $e');
+    }
 
     // Fallback to enrollments endpoint if needed
     if (streamNames.isEmpty) {

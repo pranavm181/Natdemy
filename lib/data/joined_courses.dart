@@ -484,34 +484,23 @@ class JoinedCourses {
       }
     }
 
-      // Load from API (either force refresh or no cache available)
-      int retries = 3;
-      for (int i = 0; i < retries; i++) {
-        try {
-          if (i > 0) {
-            await Future.delayed(Duration(milliseconds: 50 * i)); // Reduced delay
-          }
-
-          try {
-            final apiCourses = await _loadCoursesFromAPI();
-            _joined
-              ..clear()
-              ..addAll(apiCourses);
-            debugPrint('✅ Loaded ${_joined.length} course(s) from API for $_currentEmail');
-            
-            // Chapters will be loaded on-demand when user clicks "Load Chapters" button
-            // This significantly improves page load time
-            
-            await _saveCourses();
-            return;
-        } catch (e) {
-          debugPrint('⚠️ Failed to load from API: $e');
-          if (forceRefresh) {
-            _joined.clear();
-            await _clearCache();
-            return;
-          }
+    // Load from API (either force refresh or no cache available)
+    int retries = 3;
+    for (int i = 0; i < retries; i++) {
+      try {
+        if (i > 0) {
+          await Future.delayed(Duration(milliseconds: 50 * i)); // Reduced delay
         }
+
+        final apiCourses = await _loadCoursesFromAPI();
+        _joined
+          ..clear()
+          ..addAll(apiCourses);
+        debugPrint('✅ Loaded ${_joined.length} course(s) from API for $_currentEmail');
+        
+        await _saveCourses();
+        return;
+      } catch (e) {
       } catch (e) {
         if (i == retries - 1) {
           // Last retry failed
@@ -523,7 +512,7 @@ class JoinedCourses {
       }
     }
   }
-  
+
   Future<void> _clearCache() async {
     if (_currentEmail == null) return;
     try {
@@ -548,13 +537,22 @@ class JoinedCourses {
     if (_currentEmail == null) return [];
     
     try {
-      final enrolledCourses = await StudentService.fetchEnrolledCourses(_currentEmail!);
+      // Fetch enrolled courses and student data in parallel
+      final results = await Future.wait([
+        StudentService.fetchEnrolledCourses(_currentEmail!),
+        StudentService.fetchStudentDataWithCourseStream(_currentEmail!).catchError((e) {
+          debugPrint('⚠️ Error fetching student data with course/stream: $e');
+          return null;
+        }),
+      ]);
+
+      final enrolledCourses = results[0] as List<JoinedCourse>;
+      final studentData = results[1] as Map<String, dynamic>?;
       
       // Also check if student has a selected course/stream from registration
       // The verified field in student data determines if course should be locked/unlocked
-      try {
-        final studentData = await StudentService.fetchStudentDataWithCourseStream(_currentEmail!);
-        if (studentData != null) {
+      if (studentData != null) {
+        try {
           // Extract course_id, stream_id, and verified from student data
           int? studentCourseId;
           int? studentStreamId;
@@ -618,104 +616,100 @@ class JoinedCourses {
           
           // If student has course/stream selected, add it (locked or unlocked based on verified)
           if (studentCourseId != null && studentStreamId != null) {
+            // Fetch courses (this also loads streams into cache)
+            final allCourses = await CourseService.fetchCourses();
+            
+            Course? selectedCourse;
             try {
-              // Fetch courses (this also loads streams into cache)
-              final allCourses = await CourseService.fetchCourses();
-              
-              Course? selectedCourse;
+              selectedCourse = allCourses.firstWhere((c) => c.id == studentCourseId);
+            } catch (e) {
+              // Course not found, skip
+            }
+            
+            if (selectedCourse != null) {
+              // Find stream name
+              final streams = CourseService.cachedStreams;
+              CourseStream? selectedStream;
               try {
-                selectedCourse = allCourses.firstWhere((c) => c.id == studentCourseId);
+                selectedStream = streams.firstWhere((s) => s.id == studentStreamId);
               } catch (e) {
-                // Course not found, skip
+                // Stream not found, skip
               }
               
-              if (selectedCourse != null) {
-                // Find stream name
-                final streams = CourseService.cachedStreams;
-                CourseStream? selectedStream;
-                try {
-                  selectedStream = streams.firstWhere((s) => s.id == studentStreamId);
-                } catch (e) {
-                  // Stream not found, skip
-                }
+              if (selectedStream != null) {
+                // Determine if course should be locked based on verified field
+                final isEnrolled = studentVerified == true;
                 
-                if (selectedStream != null) {
-                  // Determine if course should be locked based on verified field
-                  final isEnrolled = studentVerified == true;
-                  
-                  // Skip fetching chapters - load them on-demand for better performance
-                  // Chapters will be loaded when user navigates to course detail
-                  List<CourseChapter> chapters = [];
-                  
-                  // Create course entry (locked or unlocked based on verified status)
-                  final studentCourse = JoinedCourse(
-                    courseId: selectedCourse.id,
-                    title: selectedCourse.title,
-                    color: selectedCourse.color,
-                    description: selectedCourse.description.isNotEmpty 
-                        ? selectedCourse.description 
-                        : 'Description not available.',
-                    rating: selectedCourse.rating,
-                    streamId: selectedStream.id,
-                    streamName: selectedStream.name,
-                    whatYoullLearn: selectedCourse.whatYoullLearn,
-                    thumbnailUrl: selectedCourse.thumbnailUrl,
-                    durationHours: selectedCourse.durationHours,
-                    duration: selectedCourse.duration,
-                    studentCount: selectedCourse.studentCount,
-                    price: selectedCourse.price,
-                    lessonsCount: selectedCourse.lessonsCount,
-                    chaptersCount: selectedCourse.chaptersCount,
-                    topics: selectedCourse.topics,
-                    chapters: chapters,
-                    isEnrolled: isEnrolled,
-                  );
-                  
-                  // Add course if not already in list
-                  if (!hasEnrollment) {
-                    enrolledCourses.add(studentCourse);
-                  } else {
-                    // Update existing enrollment with verified status from student data
-                    final existingIndex = enrolledCourses.indexWhere((c) => 
-                      c.courseId == studentCourseId && c.streamId == studentStreamId);
-                    if (existingIndex >= 0) {
-                      final existingCourse = enrolledCourses[existingIndex];
-                      final finalIsEnrolled = studentVerified != null ? isEnrolled : existingCourse.isEnrolled;
-                      
-                      enrolledCourses[existingIndex] = JoinedCourse(
-                        courseId: existingCourse.courseId,
-                        title: existingCourse.title,
-                        color: existingCourse.color,
-                        description: existingCourse.description,
-                        rating: existingCourse.rating,
-                        streamId: existingCourse.streamId,
-                        streamName: existingCourse.streamName,
-                        whatYoullLearn: existingCourse.whatYoullLearn,
-                        thumbnailUrl: existingCourse.thumbnailUrl,
-                        durationHours: existingCourse.durationHours,
-                        duration: existingCourse.duration,
-                        studentCount: existingCourse.studentCount,
-                        price: existingCourse.price,
-                        lessonsCount: existingCourse.lessonsCount,
-                        chaptersCount: existingCourse.chaptersCount,
-                        topics: existingCourse.topics,
-                        progressPercentage: existingCourse.progressPercentage,
-                        enrolledAt: existingCourse.enrolledAt,
-                        lastAccessedAt: existingCourse.lastAccessedAt,
-                        chapters: existingCourse.chapters,
-                        isEnrolled: finalIsEnrolled,
-                      );
-                    }
+                // Skip fetching chapters - load them on-demand for better performance
+                // Chapters will be loaded when user navigates to course detail
+                List<CourseChapter> chapters = [];
+                
+                // Create course entry (locked or unlocked based on verified status)
+                final studentCourse = JoinedCourse(
+                  courseId: selectedCourse.id,
+                  title: selectedCourse.title,
+                  color: selectedCourse.color,
+                  description: selectedCourse.description.isNotEmpty 
+                      ? selectedCourse.description 
+                      : 'Description not available.',
+                  rating: selectedCourse.rating,
+                  streamId: selectedStream.id,
+                  streamName: selectedStream.name,
+                  whatYoullLearn: selectedCourse.whatYoullLearn,
+                  thumbnailUrl: selectedCourse.thumbnailUrl,
+                  durationHours: selectedCourse.durationHours,
+                  duration: selectedCourse.duration,
+                  studentCount: selectedCourse.studentCount,
+                  price: selectedCourse.price,
+                  lessonsCount: selectedCourse.lessonsCount,
+                  chaptersCount: selectedCourse.chaptersCount,
+                  topics: selectedCourse.topics,
+                  chapters: chapters,
+                  isEnrolled: isEnrolled,
+                );
+                
+                // Add course if not already in list
+                if (!hasEnrollment) {
+                  enrolledCourses.add(studentCourse);
+                } else {
+                  // Update existing enrollment with verified status from student data
+                  final existingIndex = enrolledCourses.indexWhere((c) => 
+                    c.courseId == studentCourseId && c.streamId == studentStreamId);
+                  if (existingIndex >= 0) {
+                    final existingCourse = enrolledCourses[existingIndex];
+                    final finalIsEnrolled = studentVerified != null ? isEnrolled : existingCourse.isEnrolled;
+                    
+                    enrolledCourses[existingIndex] = JoinedCourse(
+                      courseId: existingCourse.courseId,
+                      title: existingCourse.title,
+                      color: existingCourse.color,
+                      description: existingCourse.description,
+                      rating: existingCourse.rating,
+                      streamId: existingCourse.streamId,
+                      streamName: existingCourse.streamName,
+                      whatYoullLearn: existingCourse.whatYoullLearn,
+                      thumbnailUrl: existingCourse.thumbnailUrl,
+                      durationHours: existingCourse.durationHours,
+                      duration: existingCourse.duration,
+                      studentCount: existingCourse.studentCount,
+                      price: existingCourse.price,
+                      lessonsCount: existingCourse.lessonsCount,
+                      chaptersCount: existingCourse.chaptersCount,
+                      topics: existingCourse.topics,
+                      progressPercentage: existingCourse.progressPercentage,
+                      enrolledAt: existingCourse.enrolledAt,
+                      lastAccessedAt: existingCourse.lastAccessedAt,
+                      chapters: existingCourse.chapters,
+                      isEnrolled: finalIsEnrolled,
+                    );
                   }
                 }
               }
-            } catch (e) {
-              // Silently handle errors
             }
           }
+        } catch (e) {
+          debugPrint('⚠️ Error processing student course data: $e');
         }
-      } catch (e) {
-        // Silently handle errors
       }
       
       return enrolledCourses;
